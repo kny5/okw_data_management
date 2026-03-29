@@ -52,11 +52,10 @@ def extract_kml_data(gmap_URL, func):
     else:
         mid_value += match.group(1)
         print(f"The extracted 'mid' value is: {mid_value}")
-
-    kml_url = "http://www.google.com/maps/d/kml?forcekml=1&mid=" + mid_value
+    # https://www.google.com/maps/d/u/0/kml?mid=10q6m1yyAUzFn2zqDcRwq-qInUmvoVz4q&resourcekey&forcekml=1
+    kml_url = "https://www.google.com/maps/d/u/0/kml?mid=" + mid_value + "&resourcekey&forcekml=1"
     g_map = func(kml_url)
-    kml_file = kml.KML()
-    kml_file.from_string(g_map.content)
+    kml_file = kml.KML.from_string(g_map.content)
 
     return kml_file
 

@@ -31,13 +31,14 @@ class Source_03(FlowSpec):
     def clean(self):
         filter_10 = [
             kml_object_to_dict(record)
-            for folder in list(list(self.raw.features())[0].features())
-            for record in folder.features()
+            for folder in list(list(self.raw.features)[0].features)
+            for record in folder.features
         ]
         filter_20 = pd.DataFrame(filter_10)
         filter_30 = filter_20["description"].apply(parse_description).apply(pd.Series)
         self.data = pd.concat([filter_20, filter_30], axis=1).drop(
-            columns=["description", "ns", "styleUrl"]
+            columns=["description", "ns", "styleUrl"],
+            errors="ignore"
         )
         print(self.data.columns.tolist())
         self.html = Tabular(self.data).table_output()
