@@ -7,6 +7,7 @@ app = marimo.App()
 @app.cell
 def __():
     import marimo as mo
+
     return (mo,)
 
 
@@ -58,6 +59,7 @@ def __():
     import json
     from bs4 import BeautifulSoup
     from datetime import datetime
+
     return BeautifulSoup, datetime, json, pd, requests
 
 
@@ -74,11 +76,11 @@ def __(datetime, requests):
 @app.cell
 def __(BeautifulSoup, json, response):
     html_bytes = response.content
-    html_string = html_bytes.decode('utf-8')
+    html_string = html_bytes.decode("utf-8")
 
-    soup = BeautifulSoup(html_string, 'html.parser')
-    map_content = soup.find('div', id='map')
-    markers_string = map_content.get('data-markers')
+    soup = BeautifulSoup(html_string, "html.parser")
+    map_content = soup.find("div", id="map")
+    markers_string = map_content.get("data-markers")
 
     markers_json = json.loads(markers_string)
     return (
@@ -94,14 +96,17 @@ def __(BeautifulSoup, json, response):
 @app.cell
 def __(BeautifulSoup):
     def extract_info(html_content):
-        soup = BeautifulSoup(html_content, 'html.parser')
+        soup = BeautifulSoup(html_content, "html.parser")
 
-        title = soup.find('h2', class_='workshop-title').text.strip()
-        location = soup.find('span', class_='city-country').text.strip()
-        tags = [tag.text.strip() for tag in soup.find_all('span', class_='tag primary')]
-        href = soup.find('a', class_='card-link')['href'].strip()
+        title = soup.find("h2", class_="workshop-title").text.strip()
+        location = soup.find("span", class_="city-country").text.strip()
+        tags = [tag.text.strip() for tag in soup.find_all("span", class_="tag primary")]
+        href = soup.find("a", class_="card-link")["href"].strip()
 
-        return [title] + location.split(", ") + [tags, "https://www.makertour.fr" + href]
+        return (
+            [title] + location.split(", ") + [tags, "https://www.makertour.fr" + href]
+        )
+
     return (extract_info,)
 
 
@@ -109,10 +114,9 @@ def __(BeautifulSoup):
 def __(extract_info, markers_json):
     data = []
     for record in markers_json:
+        data.append(extract_info(record["content"]) + [record["lat"], record["lng"]])
 
-        data.append(extract_info(record['content']) + [record['lat'], record['lng']])
-
-    columns = ['name', 'city', 'country', 'tags', 'url', 'latitude', 'longitude']
+    columns = ["name", "city", "country", "tags", "url", "latitude", "longitude"]
     return columns, data, record
 
 
@@ -136,7 +140,7 @@ def __(date, org_name):
 
 @app.cell
 def __(input_):
-    input_.to_csv('data/' + 'source_05' + '.csv')
+    input_.to_csv("data/" + "source_05" + ".csv")
     return
 
 
@@ -154,7 +158,7 @@ def __(input_):
 
 @app.cell
 def __():
-    #notes: notebooks will change to only collect raw data, and generate DB metadata on preparation for data aggregation process. Cleaning and sorting will be arreanged on following notebooks fro data validation and cleansing.
+    # notes: notebooks will change to only collect raw data, and generate DB metadata on preparation for data aggregation process. Cleaning and sorting will be arreanged on following notebooks fro data validation and cleansing.
     return
 
 
@@ -176,7 +180,7 @@ def __(date, file_name, input_, json, org_name, url):
         "records": input_.shape[0],
         "columns": input_.shape[1],
         "attributes": input_.columns.tolist(),
-        "updated": date
+        "updated": date,
     }
 
     # Serializing json

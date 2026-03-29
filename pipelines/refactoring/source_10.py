@@ -2,68 +2,75 @@ from metaflow import FlowSpec, step, card, Parameter
 import pandas as pd
 from itables import to_html_datatable
 from __visualisations__ import Plot
-from __functions__ import req_data, filter_points_by_proximity
-
+from __functions__ import req_data
 
 
 class Source_10(FlowSpec):
-    
-    url = Parameter('url', default="https://makery.gogocarto.fr/api/elements.json")
-    radius_ = Parameter('radius', default=100)
-    min_points_ = Parameter('min_points', default=2)
-    
+    url = Parameter("url", default="https://makery.gogocarto.fr/api/elements.json")
+    radius_ = Parameter("radius", default=100)
+    min_points_ = Parameter("min_points", default=2)
+
     @step
     def start(self):
         self.next(self.extract)
-    
+
     @step
     def extract(self):
         data = req_data(self.url).json()
-        self.raw = pd.json_normalize(data, 'data')
+        self.raw = pd.json_normalize(data, "data")
         self.next(self.clean)
-    
+
     @step
     def clean(self):
-        self.raw.rename(columns={'id': 'makery_id', 'status': 'makery_status', 'site_web': 'url', 'geo.latitude': 'latitude', 'geo.longitude': 'longitude'})
+        self.raw.rename(
+            columns={
+                "id": "makery_id",
+                "status": "makery_status",
+                "site_web": "url",
+                "geo.latitude": "latitude",
+                "geo.longitude": "longitude",
+            }
+        )
         self.next(self.transform)
-    
+
     @step
     def transform(self):
-        self.data = self.raw[self.raw['makery_status'] != 'closed']
-        self.output = self.data[['name','latitude','longitude']]
+        self.data = self.raw[self.raw["makery_status"] != "closed"]
+        self.output = self.data[["name", "latitude", "longitude"]]
         self.next(self.load)
-    
+
     @step
-    def load(self):        
+    def load(self):
         self.next(self.data_table)
-    
-        
-    @card(type='html')
+
+    @card(type="html")
     @step
     def data_table(self):
-        self.html = to_html_datatable(self.output, display_logo_when_loading=True, buttons=[
-        "pageLength",
-        {"extend": "csvHtml5", "title": "Manufacturing Locations"},
-        {"extend": "excelHtml5", "title": "Manufacturing Locations"},],)
-        
+        self.html = to_html_datatable(
+            self.output,
+            display_logo_when_loading=True,
+            buttons=[
+                "pageLength",
+                {"extend": "csvHtml5", "title": "Manufacturing Locations"},
+                {"extend": "excelHtml5", "title": "Manufacturing Locations"},
+            ],
+        )
+
         self.next(self.data_map)
-    
-    
-    @card(type='html')
+
+    @card(type="html")
     @step
     def data_map(self):
         self.html = Plot(self.output).render()
         self.next(self.end)
-    
-    @step    
+
+    @step
     def end(self):
         print("Success")
 
 
 if __name__ == "__main__":
     Source_10()
-
-
 
 
 # __generated_with = "0.8.20"

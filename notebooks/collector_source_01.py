@@ -30,6 +30,7 @@ def __(requests):
         else:
             print("Error response: Check URL or internet avalability, and Try again.")
             print(url)
+
     return (req_data,)
 
 
@@ -44,20 +45,36 @@ def __(pd, req_data):
 
 @app.cell
 def __(input_, update_date):
-    input_.to_csv('data/raw_source_01_' + update_date + '.csv')
+    input_.to_csv("data/raw_source_01_" + update_date + ".csv")
     return
 
 
 @app.cell
 def __(input_):
     input_.columns.tolist()
-    transform = input_.rename(columns={'id': 'org_id'})
-    transform['url'] = 'https://www.fablabs.io/labs/' + transform.slug
-    transform = transform[transform['activity_status'] != 'closed']
-    transform = transform[transform['activity_status'] != 'planned']
+    transform = input_.rename(columns={"id": "org_id"})
+    transform["url"] = "https://www.fablabs.io/labs/" + transform.slug
+    transform = transform[transform["activity_status"] != "closed"]
+    transform = transform[transform["activity_status"] != "planned"]
     # transform['address'] = transform.address_1.astype(str) + ', ' + transform.address_2 + ', ' + transform.county
-    output = transform.drop(columns=['activity_status','kind_name','slug', 'address_2', 'address_notes', 'parent_id', 'blurb', 'avatar_url', 'header_url', 'capabilities', 'links', 'description', 'phone'])
-    output_db = output.fillna('null')
+    output = transform.drop(
+        columns=[
+            "activity_status",
+            "kind_name",
+            "slug",
+            "address_2",
+            "address_notes",
+            "parent_id",
+            "blurb",
+            "avatar_url",
+            "header_url",
+            "capabilities",
+            "links",
+            "description",
+            "phone",
+        ]
+    )
+    output_db = output.fillna("null")
     return output, output_db, transform
 
 
@@ -69,41 +86,44 @@ def __(output_db):
 
 @app.cell
 def __(output_db, update_date):
-    output_db.to_csv('data/iopa_source_01_' + update_date + '.csv')
+    output_db.to_csv("data/iopa_source_01_" + update_date + ".csv")
     return
 
 
 @app.cell
 def __(creation_date, output, update_date):
     DatabaseSourceMetadata = {
-            'source_id': "01", #key
-            'name': "Fablabs.io FabLab Network", #unique #not_null
-            'description': "World wide Fablabs within the fablab.io platform.",
-            'source_type': "JSON",
-            'source_url': "https://api.fablabs.io/0/labs.json",
-            'license_type': "Limited",
-            'data_policy_url': "https://fablabs.io/privacy-policy", #not_null
-            'version': "0.1",
-            'creation_date': creation_date, #not_null
-            'update_date': str(update_date), #not_null
-            'keywords': "Fablab, Network, Capibilities, Machines, World",
-            'publisher': "Fab Foundation", #not_null
-            'publisher_url': "https://fabfoundation.org/", #not_null
-            'contributor': "Fab Foundation", #not_null
-            'language': "en", #not_null #language_id
-            'shape': {'entries': {str(output.shape[0])}, 'columns': {str(output.shape[1])}} #not_null
-        }
+        "source_id": "01",  # key
+        "name": "Fablabs.io FabLab Network",  # unique #not_null
+        "description": "World wide Fablabs within the fablab.io platform.",
+        "source_type": "JSON",
+        "source_url": "https://api.fablabs.io/0/labs.json",
+        "license_type": "Limited",
+        "data_policy_url": "https://fablabs.io/privacy-policy",  # not_null
+        "version": "0.1",
+        "creation_date": creation_date,  # not_null
+        "update_date": str(update_date),  # not_null
+        "keywords": "Fablab, Network, Capibilities, Machines, World",
+        "publisher": "Fab Foundation",  # not_null
+        "publisher_url": "https://fabfoundation.org/",  # not_null
+        "contributor": "Fab Foundation",  # not_null
+        "language": "en",  # not_null #language_id
+        "shape": {
+            "entries": {str(output.shape[0])},
+            "columns": {str(output.shape[1])},
+        },  # not_null
+    }
     return (DatabaseSourceMetadata,)
 
 
 @app.cell
 def __():
     ManufacturingFacility = {
-        "facility_id": None,      # int: Unique identifier for the facility
+        "facility_id": None,  # int: Unique identifier for the facility
         # "resource_id": None,      # int: Reference to the distributed resource
-        "name": "",               # string: Name of the facility
-        "description": "",        # string: Description of the facility
-        "type": "",               # string: Type of the facility
+        "name": "",  # string: Name of the facility
+        "description": "",  # string: Description of the facility
+        "type": "",  # string: Type of the facility
         # "capacity": None,         # int: Capacity of the facility
         # "capabilities": "",       # string: Capabilities of the facility
         "inventory": "None",
@@ -122,6 +142,7 @@ def __(DatabaseSourceMetadata):
 @app.cell
 def __():
     from data_models import ParserSchema
+
     return (ParserSchema,)
 
 
@@ -132,18 +153,18 @@ def __(ParserSchema, output):
     location_json_mapping = []
     for index, row in output.iterrows():
         data_dict = {
-        'latitude': row['latitude'],
-        'longitude': row['longitude'],
-        'zip_code': row['postal_code'],
-        'extended': row['address_1'],
-        'country': row['country_code'],
-        'state_region': row['county'],
-        'city_town': row['city'],
-        'org_id': row['org_id'],
-        'description': 'fablab',
-        'name': row['name'],
-        'url': row['url']
-    }
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+            "zip_code": row["postal_code"],
+            "extended": row["address_1"],
+            "country": row["country_code"],
+            "state_region": row["county"],
+            "city_town": row["city"],
+            "org_id": row["org_id"],
+            "description": "fablab",
+            "name": row["name"],
+            "url": row["url"],
+        }
         location_json_mapping.append(_schema.dumping(data_dict))
     return data_dict, index, location_json_mapping, row
 
@@ -156,19 +177,27 @@ def __(location_json_mapping):
 
 @app.cell
 def __(location_json_mapping):
-    geocode_list = [item['geocoding'] for item in location_json_mapping if item['geocoding'] is not None]
+    geocode_list = [
+        item["geocoding"]
+        for item in location_json_mapping
+        if item["geocoding"] is not None
+    ]
     return (geocode_list,)
 
 
 @app.cell
 def __(location_json_mapping):
-    region_list = [item['region'] for item in location_json_mapping if item['region'] is not None]
+    region_list = [
+        item["region"] for item in location_json_mapping if item["region"] is not None
+    ]
     return (region_list,)
 
 
 @app.cell
 def __(pd, region_list):
-    df_region = pd.DataFrame(region_list).drop_duplicates(subset=['country', 'state_region', 'city_town'])
+    df_region = pd.DataFrame(region_list).drop_duplicates(
+        subset=["country", "state_region", "city_town"]
+    )
     return (df_region,)
 
 
@@ -180,13 +209,15 @@ def __(df_region):
 
 @app.cell
 def __(df_region):
-    df_region_unique = df_region.drop_duplicates(subset=['country', 'state_region', 'city_town'], keep='first')
+    df_region_unique = df_region.drop_duplicates(
+        subset=["country", "state_region", "city_town"], keep="first"
+    )
     return (df_region_unique,)
 
 
 @app.cell
 def __(df_region_unique):
-    df_region_unique.to_json('iopa_okw_regions.json', orient="records")
+    df_region_unique.to_json("iopa_okw_regions.json", orient="records")
     return
 
 
@@ -197,7 +228,7 @@ def __():
 
 @app.cell
 def __(df_region_unique):
-    df_region_unique.to_csv('iopa_okw_regions.csv')
+    df_region_unique.to_csv("iopa_okw_regions.csv")
     return
 
 
@@ -223,8 +254,8 @@ def __(region_list):
 def __(location_json_mapping):
     import json
 
-    #jsonfile = json.loads(location_json_mapping)
-    with open('data/preliminary_iop_okw_fac_source_01.json', 'w') as base:
+    # jsonfile = json.loads(location_json_mapping)
+    with open("data/preliminary_iop_okw_fac_source_01.json", "w") as base:
         json.dump(location_json_mapping, base, indent=4)
         base.close()
     return base, json
@@ -247,25 +278,28 @@ def __(output):
     import numpy as np
     from folium.plugins import FastMarkerCluster, Fullscreen, FloatImage
 
-    tiles_url = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
-    tiles_attribution = 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+    tiles_url = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+    tiles_attribution = "Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ"
 
-    output_map_w = output.dropna(subset=['latitude', 'longitude'])
+    output_map_w = output.dropna(subset=["latitude", "longitude"])
 
     # Filtered for EG FR map
-    output_map = output_map_w[output_map_w['country_code'].isin(['FR','EG'])]
+    output_map = output_map_w[output_map_w["country_code"].isin(["FR", "EG"])]
 
     # Check for NaN values in latitude and longitude before creating the map
-    if not np.isnan(output_map['latitude']).any() and not np.isnan(output_map['longitude']).any():
+    if (
+        not np.isnan(output_map["latitude"]).any()
+        and not np.isnan(output_map["longitude"]).any()
+    ):
         m = folium.Map(
-            location=[output_map['latitude'].mean(), output_map['longitude'].mean()],
+            location=[output_map["latitude"].mean(), output_map["longitude"].mean()],
             zoom_start=4,
             tiles=tiles_url,
             attr=tiles_attribution,
             max_zoom=16,
             # worldCopyJump= False,
-            zoomControl= False,
-            prefer_canvas=True
+            zoomControl=False,
+            prefer_canvas=True,
         )
 
     else:
@@ -286,7 +320,7 @@ def __(output):
 
 @app.cell
 def __():
-    icon_cluster = '''
+    icon_cluster = """
         function (cluster) {
 
         var childCount = cluster.getChildCount();
@@ -325,7 +359,7 @@ def __():
             iconSize: new L.Point(size, size)
         });
     }
-    '''
+    """
     # clip-path: inset(1% 1% round 40% 1% 1% 1%);
     return (icon_cluster,)
 
@@ -369,26 +403,30 @@ def __(
     m,
     output_map,
 ):
-    zip_data = [(row['latitude'], row['longitude'], row['name'], 
-                 row['url'], 
-                 row['email']) 
-                for index, row in output_map.iterrows()]
+    zip_data = [
+        (row["latitude"], row["longitude"], row["name"], row["url"], row["email"])
+        for index, row in output_map.iterrows()
+    ]
 
-    marker_cluster = FastMarkerCluster(data=zip_data, 
-                                       icon_create_function=icon_cluster,
-                                       callback=callback,
-                                       options={'singleMarkerMode': True}).add_to(m)
+    marker_cluster = FastMarkerCluster(
+        data=zip_data,
+        icon_create_function=icon_cluster,
+        callback=callback,
+        options={"singleMarkerMode": True},
+    ).add_to(m)
 
-    #Fullscreen(
+    # Fullscreen(
     #    position="topright",
     #    force_separate_button=True,
-    #).add_to(m)
+    # ).add_to(m)
 
-    FloatImage("https://github.com/iop-alliance/data_reports/blob/main/assets/img/iopa_logo_okw_sm.png?raw=true", 
-                    bottom=5, 
-                    left=5).add_to(m)
+    FloatImage(
+        "https://github.com/iop-alliance/data_reports/blob/main/assets/img/iopa_logo_okw_sm.png?raw=true",
+        bottom=5,
+        left=5,
+    ).add_to(m)
 
-    m.save('output.html')
+    m.save("output.html")
     return marker_cluster, zip_data
 
 
@@ -400,7 +438,7 @@ def __(m):
 
 @app.cell
 def __(m):
-    m.save('mvp_10.html')
+    m.save("mvp_10.html")
     return
 
 
@@ -416,15 +454,20 @@ def __(output_db):
 
     def get_continent(country_alpha2):
         continent_code = pcountry.country_alpha2_to_continent_code(country_alpha2)
-        continent_name = pcountry.convert_continent_code_to_continent_name(continent_code)
+        continent_name = pcountry.convert_continent_code_to_continent_name(
+            continent_code
+        )
         return continent_name
 
-    output_db['continent'] = output_db['country_code'].apply(get_continent)
-    grouped_db = output_db.groupby(['continent', 'country_code']).size().reset_index(name='Location Count')
+    output_db["continent"] = output_db["country_code"].apply(get_continent)
+    grouped_db = (
+        output_db.groupby(["continent", "country_code"])
+        .size()
+        .reset_index(name="Location Count")
+    )
     top_three_db = (
-        grouped_db
-        .sort_values(['continent', 'Location Count'], ascending=[True, False])
-        .groupby('continent')
+        grouped_db.sort_values(["continent", "Location Count"], ascending=[True, False])
+        .groupby("continent")
         .head(3)
     )
     return get_continent, grouped_db, pcountry, top_three_db

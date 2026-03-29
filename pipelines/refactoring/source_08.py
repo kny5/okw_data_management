@@ -1,4 +1,3 @@
-
 __generated_with = "0.8.20"
 
 # %%
@@ -16,10 +15,13 @@ import pandas as pd
 
 # %%
 from datetime import datetime
+
 now = datetime.now()
 
 # %%
-kml_url = "http://www.google.com/maps/d/kml?forcekml=1&mid=123W1JzyYEJlCg3Dh21OcTCLIknk-s_Y"
+kml_url = (
+    "http://www.google.com/maps/d/kml?forcekml=1&mid=123W1JzyYEJlCg3Dh21OcTCLIknk-s_Y"
+)
 
 # %%
 
@@ -54,6 +56,7 @@ mo.md(
     """
 )
 
+
 # %%
 def req_data(url):
     response = requests.get(url)
@@ -64,9 +67,10 @@ def req_data(url):
     else:
         print(url)
         print(response.status_code)
-        print('Error response: Check URL or internet avalability, and Try again.')
+        print("Error response: Check URL or internet avalability, and Try again.")
         print(url)
         return False
+
 
 # %%
 g_map = req_data(kml_url).content
@@ -90,10 +94,10 @@ for folder in f2:
         table.append((record.name, record.geometry.x, record.geometry.y, folder.name))
 
 # %%
-output = pd.DataFrame(table, columns=['name', 'latitude', 'longitude', 'type'])
+output = pd.DataFrame(table, columns=["name", "latitude", "longitude", "type"])
 
 # %%
-output.to_csv('data/source_08' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+output.to_csv("data/source_08" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
 
 # %%
 print("OKW entries: {r[0]}, columns = {r[1]}".format(r=output.shape))

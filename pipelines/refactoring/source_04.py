@@ -1,4 +1,3 @@
-
 __generated_with = "0.8.20"
 
 # %%
@@ -16,6 +15,7 @@ import pandas as pd
 
 # %%
 from datetime import datetime
+
 now = datetime.now()
 
 # %%
@@ -54,6 +54,7 @@ mo.md(
     """
 )
 
+
 # %%
 def req_data(url):
 
@@ -66,6 +67,7 @@ def req_data(url):
     else:
         print("Error response: Check URL or internet avalability, and Try again.")
         print(url)
+
 
 # %%
 g_map = req_data(kml_url).content
@@ -86,10 +88,10 @@ for folder in list(features[0].features()):
         table.append((record.name, record.geometry.x, record.geometry.y, folder.name))
 
 # %%
-output = pd.DataFrame(table, columns=['name', 'latitude', 'longitude', 'type'])
+output = pd.DataFrame(table, columns=["name", "latitude", "longitude", "type"])
 
 # %%
-output.to_csv('data/source_04_' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+output.to_csv("data/source_04_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
 
 # %%
 print("OKW entries: {r[0]}, columns = {r[1]}".format(r=output.shape))

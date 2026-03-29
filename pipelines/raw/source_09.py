@@ -7,6 +7,7 @@ app = marimo.App()
 @app.cell
 def __():
     import marimo as mo
+
     return (mo,)
 
 
@@ -59,12 +60,14 @@ def __():
     import pandas as pd
     import json
     import io
+
     return io, json, pd, requests
 
 
 @app.cell
 def __():
     from datetime import datetime
+
     now = datetime.now()
     return datetime, now
 
@@ -82,6 +85,7 @@ def __(requests):
         else:
             print("Error response: Check URL or internet avalability, and Try again.")
             print(url)
+
     return (req_data,)
 
 
@@ -107,7 +111,7 @@ def __(input_):
 
 @app.cell
 def __(input_, now):
-    input_.to_csv('data/raw_source_09_' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+    input_.to_csv("data/raw_source_09_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
     return
 
 
@@ -125,7 +129,7 @@ def __(input_):
 
 @app.cell
 def __(now, output):
-    output.to_csv('data/source_09_' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+    output.to_csv("data/source_09_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
     return
 
 

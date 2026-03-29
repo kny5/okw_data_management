@@ -7,6 +7,7 @@ app = marimo.App()
 @app.cell
 def __():
     import marimo as mo
+
     return (mo,)
 
 
@@ -55,6 +56,7 @@ def __():
 @app.cell
 def __():
     from fastkml import kml
+
     return (kml,)
 
 
@@ -62,12 +64,14 @@ def __():
 def __():
     import requests
     import pandas as pd
+
     return pd, requests
 
 
 @app.cell
 def __():
     from datetime import datetime
+
     now = datetime.now()
     return datetime, now
 
@@ -85,6 +89,7 @@ def __(requests):
         else:
             print("Error response: Check URL or internet avalability, and Try again.")
             print(url)
+
     return (req_data,)
 
 
@@ -134,25 +139,27 @@ def __(f2):
     for folder in f2:
         f = folder.features()
         for record in f:
-            table.append((record.name, record.geometry.x, record.geometry.y, folder.name))
+            table.append(
+                (record.name, record.geometry.x, record.geometry.y, folder.name)
+            )
     return f, folder, record, table
 
 
 @app.cell
 def __():
-    #table, len(table)
+    # table, len(table)
     return
 
 
 @app.cell
 def __(pd, table):
-    output = pd.DataFrame(table, columns=['name', 'latitude', 'longitude', 'type'])
+    output = pd.DataFrame(table, columns=["name", "latitude", "longitude", "type"])
     return (output,)
 
 
 @app.cell
 def __(now, output):
-    output.to_csv('data/source_03_' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+    output.to_csv("data/source_03_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
     return
 
 

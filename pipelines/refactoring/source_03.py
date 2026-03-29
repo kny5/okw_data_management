@@ -1,4 +1,3 @@
-
 __generated_with = "0.8.20"
 
 # %%
@@ -8,13 +7,16 @@ import marimo as mo
 from fastkml import kml
 import pandas as pd
 from datetime import datetime
+
 now = datetime.now()
 from __functions__ import req_data
 
 # %%
 google_map_url = "https://www.google.com/maps/d/u/0/viewer?mid=10q6m1yyAUzFn2zqDcRwq-qInUmvoVz4q&ll=37.844558%2C-122.27696200000003&z=8"
 
-kml_url = "http://www.google.com/maps/d/kml?forcekml=1&mid=10q6m1yyAUzFn2zqDcRwq-qInUmvoVz4q"
+kml_url = (
+    "http://www.google.com/maps/d/kml?forcekml=1&mid=10q6m1yyAUzFn2zqDcRwq-qInUmvoVz4q"
+)
 
 
 # %%
@@ -68,10 +70,12 @@ for folder in f2:
         table.append((record.name, record.geometry.x, record.geometry.y, folder.name))
 
 # %%
-output = pd.DataFrame(table, columns=['name', 'latitude', 'longitude', 'type'])
+output = pd.DataFrame(table, columns=["name", "latitude", "longitude", "type"])
 
 # %%
-file = output.to_csv('data/source_03_' + now.strftime("%Y_%m_%d_%H%M") + '.csv', index=False)
+file = output.to_csv(
+    "data/source_03_" + now.strftime("%Y_%m_%d_%H%M") + ".csv", index=False
+)
 
 # %%
 print("OKW entries: {r[0]}, columns = {r[1]}".format(r=output.shape))

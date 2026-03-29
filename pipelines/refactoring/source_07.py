@@ -1,13 +1,14 @@
-
 __generated_with = "0.8.20"
 
 # %%
 import marimo as mo
 
 # %%
-import requests, json, re, time
+import json
+import re
 import pandas as pd
 from datetime import datetime
+
 now = datetime.now()
 from bs4 import BeautifulSoup as soup
 from __functions__ import req_data
@@ -43,21 +44,21 @@ mo.md(
     """
 )
 
+
 # %%
 def decrypt(js):
-    if js != None:
+    if js is not None:
+        a_cut = js[17:104].replace("\\", "")
+        c_cut = js[123:181].replace("\\", "")
 
-        a_cut = js[17:104].replace('\\', '')
-        c_cut = js[123:181].replace('\\', '')
-
-        try: 
+        try:
             a = re.search(re.compile(r'var a="(.*?)";'), a_cut).group(1)
             c = re.search(re.compile(r'var c="(.*?)";'), c_cut).group(1)
         except AttributeError:
             return None
 
-        b = ''.join(sorted(a))
-        d = ''
+        b = "".join(sorted(a))
+        d = ""
 
         for e in c:
             d += b[a.index(e)]
@@ -67,8 +68,13 @@ def decrypt(js):
         print("No Js received")
         return None
 
+
 # %%
-data = [x.text for x in soup(req_data(url).text, 'html.parser').find_all('script') if 'vow.Map' in x.text][-1]
+data = [
+    x.text
+    for x in soup(req_data(url).text, "html.parser").find_all("script")
+    if "vow.Map" in x.text
+][-1]
 
 # %%
 data_f = '[{"' + re.findall(r'\[{"(.*?)"\}\]\,', data)[0] + '"}]'
@@ -81,31 +87,51 @@ input_ = pd.DataFrame(data_json)
 input_.reset_index(drop=True, inplace=True)
 
 # %%
-input_.to_csv('data/raw_source_07_' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+input_.to_csv("data/raw_source_07_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
 
 # %%
 input_.columns.tolist()
 
 # %%
-transform = input_.rename(columns={'uid': 'offene_id', 'lat': 'latitude', 'lng': 'longitude', 'zip':'postal_code'})
+transform = input_.rename(
+    columns={
+        "uid": "offene_id",
+        "lat": "latitude",
+        "lng": "longitude",
+        "zip": "postal_code",
+    }
+)
 
 # %%
-transform['address'] = transform.street.astype(str) + ', ' + transform.street_nr + ', ' + transform.aai
+transform["address"] = (
+    transform.street.astype(str) + ", " + transform.street_nr + ", " + transform.aai
+)
 
 # %%
-transform['offene_url'] = 'https://www.offene-werkstaetten.org/werkstatt/' + transform.url
+transform["offene_url"] = (
+    "https://www.offene-werkstaetten.org/werkstatt/" + transform.url
+)
 
 # %%
-transform['contact_email']  = transform.offene_url.apply(lambda x: decrypt(soup(req_data(x, 2).content, 'html.parser').find('span', text=re.compile(r'javascript protected email address')).find_next_sibling('script').text))
+transform["contact_email"] = transform.offene_url.apply(
+    lambda x: decrypt(
+        soup(req_data(x, 2).content, "html.parser")
+        .find("span", text=re.compile(r"javascript protected email address"))
+        .find_next_sibling("script")
+        .text
+    )
+)
 
 # %%
-output = transform.drop(columns=['img', 'street', 'street_nr', 'aai', 'cats', 'url', 'icm', 'web'])
+output = transform.drop(
+    columns=["img", "street", "street_nr", "aai", "cats", "url", "icm", "web"]
+)
 
 # %%
 output.columns.tolist()
 
 # %%
-output.to_csv('data/source_07_' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+output.to_csv("data/source_07_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
 
 # %%
 print("OKW entries: {r[0]}, columns = {r[1]}".format(r=output.shape))

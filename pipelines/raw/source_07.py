@@ -7,6 +7,7 @@ app = marimo.App()
 @app.cell(hide_code=True)
 def __():
     import marimo as mo
+
     return (mo,)
 
 
@@ -46,12 +47,17 @@ def __(mo):
 
 @app.cell
 def __():
-    import requests, json, re, time
+    import requests
+    import json
+    import re
+    import time
     import pandas as pd
     from datetime import datetime
+
     now = datetime.now()
     from bs4 import BeautifulSoup as soup
     from __functions__ import req_data
+
     return datetime, json, now, pd, re, req_data, requests, soup, time
 
 
@@ -63,7 +69,11 @@ def __():
 
 @app.cell
 def __(req_data, soup, url):
-    data = [x.text for x in soup(req_data(url).text, 'html.parser').find_all('script') if 'vow.Map' in x.text][-1]
+    data = [
+        x.text
+        for x in soup(req_data(url).text, "html.parser").find_all("script")
+        if "vow.Map" in x.text
+    ][-1]
     return (data,)
 
 
@@ -88,7 +98,7 @@ def __(input_):
 
 @app.cell
 def __(input_, now):
-    input_.to_csv('data/raw_source_07_' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+    input_.to_csv("data/raw_source_07_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
     return
 
 
@@ -100,38 +110,48 @@ def __(input_):
 
 @app.cell
 def __(input_):
-    transform = input_.rename(columns={'uid': 'offene_id', 'lat': 'latitude', 'lng': 'longitude', 'zip':'postal_code'})
+    transform = input_.rename(
+        columns={
+            "uid": "offene_id",
+            "lat": "latitude",
+            "lng": "longitude",
+            "zip": "postal_code",
+        }
+    )
     return (transform,)
 
 
 @app.cell
 def __(transform):
-    transform['offene_url'] = 'https://www.offene-werkstaetten.org/werkstatt/' + transform.url
+    transform["offene_url"] = (
+        "https://www.offene-werkstaetten.org/werkstatt/" + transform.url
+    )
     return
 
 
 @app.cell
 def __(transform):
-    transform['address'] = transform.street.astype(str) + ', ' + transform.street_nr + ', ' + transform.aai
+    transform["address"] = (
+        transform.street.astype(str) + ", " + transform.street_nr + ", " + transform.aai
+    )
     return
 
 
 @app.cell
 def __(re):
     def decrypt(js):
-        if js != None:
+        if js is not None:
+            a_cut = js[17:104].replace("\\", "")
+            c_cut = js[123:181].replace("\\", "")
 
-            a_cut = js[17:104].replace('\\', '')
-            c_cut = js[123:181].replace('\\', '')
-
-            try: 
+            try:
                 a = re.search(re.compile(r'var a="(.*?)";'), a_cut).group(1)
                 c = re.search(re.compile(r'var c="(.*?)";'), c_cut).group(1)
             except AttributeError:
                 return None
 
-            b = ''.join(sorted(a))
-            d = ''
+            b = "".join(sorted(a))
+            d = ""
 
             for e in c:
                 d += b[a.index(e)]
@@ -140,24 +160,34 @@ def __(re):
         else:
             print("No Js received")
             return None
+
     return (decrypt,)
 
 
 @app.cell
 def __(decrypt, re, req_data, soup, transform):
-    transform['contact_email']  = transform.offene_url.apply(lambda x: decrypt(soup(req_data(x, 2).content, 'html.parser').find('span', text=re.compile(r'javascript protected email address')).find_next_sibling('script').text))
+    transform["contact_email"] = transform.offene_url.apply(
+        lambda x: decrypt(
+            soup(req_data(x, 2).content, "html.parser")
+            .find("span", text=re.compile(r"javascript protected email address"))
+            .find_next_sibling("script")
+            .text
+        )
+    )
     return
 
 
 @app.cell
 def __(transform):
-    output = transform.drop(columns=['img', 'street', 'street_nr', 'aai', 'cats', 'url', 'icm', 'web'])
+    output = transform.drop(
+        columns=["img", "street", "street_nr", "aai", "cats", "url", "icm", "web"]
+    )
     return (output,)
 
 
 @app.cell
 def __(now, output):
-    output.to_csv('data/source_07_' + now.strftime("%Y_%m_%d_%H%M") + '.csv')
+    output.to_csv("data/source_07_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
     return
 
 

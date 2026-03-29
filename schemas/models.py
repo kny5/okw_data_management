@@ -24,6 +24,7 @@ def __(post_load, uuid):
         Methods:
         - None
         """
+
         geocoding_id = fields.Str(dump_only=True)
         format = fields.Str(required=True)
         latitude = fields.Float()
@@ -36,10 +37,8 @@ def __(post_load, uuid):
         @post_load
         def add_id(self, data, **kwargs):
             # Add a unique ID to the data
-            data['geocoding_id'] = str(uuid.uuid4())
+            data["geocoding_id"] = str(uuid.uuid4())
             return data
-
-
 
     class AddressSchema(Schema):
         """
@@ -55,6 +54,7 @@ def __(post_load, uuid):
         Methods:
         - None
         """
+
         address_id = fields.Str(dump_only=True)
         zip_code = fields.Str()
         street = fields.Str()
@@ -64,10 +64,8 @@ def __(post_load, uuid):
         @post_load
         def add_id(self, data, **kwargs):
             # Add a unique ID to the data
-            data['address_id'] = str(uuid.uuid4())
+            data["address_id"] = str(uuid.uuid4())
             return data
-
-
 
     class RegionSchema(Schema):
         """
@@ -82,6 +80,7 @@ def __(post_load, uuid):
         Methods:
         - None
         """
+
         region_id = fields.Str(dump_only=True)
         country = fields.Str()
         state_region = fields.Str()
@@ -90,9 +89,8 @@ def __(post_load, uuid):
         @post_load
         def add_id(self, data, **kwargs):
             # Add a unique ID to the data
-            data['region_id'] = str(uuid.uuid4())
+            data["region_id"] = str(uuid.uuid4())
             return data
-
 
     class LocationSchema(Schema):
         """
@@ -104,6 +102,7 @@ def __(post_load, uuid):
         Methods:
         - None
         """
+
         location_id = fields.Str(dump_only=True)
         geocoding_id = fields.Str(required=True)
         address_id = fields.Str(required=True)
@@ -112,9 +111,8 @@ def __(post_load, uuid):
         @post_load
         def add_id(self, data, **kwargs):
             # Add a unique ID to the data
-            data['region_id'] = str(uuid.uuid4())
+            data["region_id"] = str(uuid.uuid4())
             return data
-
 
     class ManufacturingFacilitySchema(Schema):
         """
@@ -132,7 +130,6 @@ def __(post_load, uuid):
         - set_location(location_dict): Sets the location for the facility
         """
 
-
         facility_id = fields.Str(dump_only=True)
         name = fields.Str(required=True)
         description = fields.Str(required=True)
@@ -143,8 +140,9 @@ def __(post_load, uuid):
         @post_load
         def add_id(self, data, **kwargs):
             # Add a unique ID to the data
-            data['facility_id'] = str(uuid.uuid4())
+            data["facility_id"] = str(uuid.uuid4())
             return data
+
     return (
         AddressSchema,
         GeocodingSchema,

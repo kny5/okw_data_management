@@ -12,7 +12,6 @@ import logging
 import functools
 
 
-
 def retry_on_exception(max_retries=3, backoff_factor=1):
     """
     Decorator to retry a function on exception.
@@ -28,7 +27,9 @@ def retry_on_exception(max_retries=3, backoff_factor=1):
             retries = 0
             while True:
                 try:
-                    return func(*args, **kwargs)  # Execute and return the function result
+                    return func(
+                        *args, **kwargs
+                    )  # Execute and return the function result
                 except requests.exceptions.RequestException as e:
                     if retries < max_retries:
                         sleep(backoff_factor * (retries + 1))
@@ -41,7 +42,14 @@ def retry_on_exception(max_retries=3, backoff_factor=1):
     return decorator
 
 
-def req_data(url, timer=1, verbose=False, head={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0'}):
+def req_data(
+    url,
+    timer=1,
+    verbose=False,
+    head={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
+    },
+):
     """
     Sends a GET request to the specified URL and returns the response.
 
@@ -51,7 +59,10 @@ def req_data(url, timer=1, verbose=False, head={'User-Agent': 'Mozilla/5.0 (Wind
         recursive:
         verbose:
     """
-    @retry_on_exception(max_retries=5, backoff_factor=2)  # Increase max retries and backoff factor
+
+    @retry_on_exception(
+        max_retries=5, backoff_factor=2
+    )  # Increase max retries and backoff factor
     def inner():
         response = requests.get(url, headers=head)
         if response.status_code == 200:
@@ -67,11 +78,10 @@ def req_data(url, timer=1, verbose=False, head={'User-Agent': 'Mozilla/5.0 (Wind
     return inner()  # Directly return the response
 
 
-
 def iter_request(url):
     data = []
     x = 0
-    
+
     while True:
         response = requests.get(url.format(n=x))
         json_data = response.json()
@@ -79,6 +89,6 @@ def iter_request(url):
             break
         data += json_data
         x += 1
-        print('Pages: {p}'.format(p=x))
-        print('Entries: {e}'.format(e=len(data)))
+        print("Pages: {p}".format(p=x))
+        print("Entries: {e}".format(e=len(data)))
     return data

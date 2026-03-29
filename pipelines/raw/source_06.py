@@ -7,6 +7,7 @@ app = marimo.App()
 @app.cell
 def __():
     import marimo as mo
+
     return (mo,)
 
 
@@ -24,7 +25,9 @@ def __(mo):
 
 @app.cell
 def __(mo):
-    mo.md("""\n    Author: Antonio de Jesus Anaya Hernandez, DevOps eng. for the IoPA.\n\n    Author: The internet of Production Alliance, 2023.\n\n    Data was collected by "Make Works, FabLab Barcelona and its partners", URL location: https://make.works/companies\n\n    The Open Know Where (OKW) Initiative is part of the Internet of Production Alliance and its members.\n\n    License: CC BY SA\n\n    ![CC BY SA](https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg)\n\n    Description: Python code for downloading, parsing, filtering, sorting data, exporting the RAW FabLabs, and the processed IOPA data as CSV.\n""")
+    mo.md(
+        """\n    Author: Antonio de Jesus Anaya Hernandez, DevOps eng. for the IoPA.\n\n    Author: The internet of Production Alliance, 2023.\n\n    Data was collected by "Make Works, FabLab Barcelona and its partners", URL location: https://make.works/companies\n\n    The Open Know Where (OKW) Initiative is part of the Internet of Production Alliance and its members.\n\n    License: CC BY SA\n\n    ![CC BY SA](https://mirrors.creativecommons.org/presskit/buttons/88x31/svg/by-sa.svg)\n\n    Description: Python code for downloading, parsing, filtering, sorting data, exporting the RAW FabLabs, and the processed IOPA data as CSV.\n"""
+    )
     return
 
 
@@ -32,12 +35,14 @@ def __(mo):
 def __():
     import requests
     import pandas as pd
+
     return pd, requests
 
 
 @app.cell
 def __():
     from datetime import datetime
+
     now = datetime.now()
     return datetime, now
 
@@ -52,15 +57,16 @@ def __(requests):
             return response
         else:
             print(response.status_code)
-            print('Error response: Check URL or internet avalability, and Try again.')
+            print("Error response: Check URL or internet avalability, and Try again.")
             print(url)
             return False
+
     return (req_data,)
 
 
 @app.cell
 def __(requests):
-    url = 'https://make.works/companies?page={n}&format=json'
+    url = "https://make.works/companies?page={n}&format=json"
     data = []
     x = 0
     while True:
@@ -70,8 +76,8 @@ def __(requests):
             break
         data += json_data
         x += 1
-    print('Pages: {p}'.format(p=x))
-    print('Entries: {e}'.format(e=len(data)))
+    print("Pages: {p}".format(p=x))
+    print("Entries: {e}".format(e=len(data)))
     return data, json_data, response, url, x
 
 
@@ -89,7 +95,7 @@ def __(input_):
 
 @app.cell
 def __(input_, now):
-    input_.to_csv('data/source_06_' + now.strftime('%Y_%m_%d_%H%M') + '.csv')
+    input_.to_csv("data/source_06_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
     return
 
 
@@ -101,25 +107,74 @@ def __(input_):
 
 @app.cell
 def __(input_):
-    transform = input_.rename(columns={'id': 'makeworks_id', 'url': 'makeworks_url', 'lat': 'latitude', 'lng': 'longitude'})
+    transform = input_.rename(
+        columns={
+            "id": "makeworks_id",
+            "url": "makeworks_url",
+            "lat": "latitude",
+            "lng": "longitude",
+        }
+    )
     return (transform,)
 
 
 @app.cell
 def __(transform):
-    transform_2 = transform[transform['soft_delete'] != True]
+    transform_2 = transform[not transform["soft_delete"]]
     return (transform_2,)
 
 
 @app.cell
 def __(transform_2):
-    output = transform_2.drop(columns=['medium_run', 'minimum_order', 'short_run', 'turnaround_time', 'twitter', 'm_id', 'region_ids', 'background', 'intro', 'contact_name', 'contact_phone', 'contact_jobtitle', 'youtube', 'year_founded', 'film_ready', 'title', 'top_image', 'flickr', 'facebook', 'instagram', 'number_of_staff', 'file_types', 'image_bucket', 'photo1', 'photo2', 'photo3', 'photo4', 'photo5', 'photo6', 'photo7', 'photo8', 'photo9', 'pinterest', 'portrait', 'sample_production', 'soft_delete', 'large_run', 'linkedin', 'video_link'])
+    output = transform_2.drop(
+        columns=[
+            "medium_run",
+            "minimum_order",
+            "short_run",
+            "turnaround_time",
+            "twitter",
+            "m_id",
+            "region_ids",
+            "background",
+            "intro",
+            "contact_name",
+            "contact_phone",
+            "contact_jobtitle",
+            "youtube",
+            "year_founded",
+            "film_ready",
+            "title",
+            "top_image",
+            "flickr",
+            "facebook",
+            "instagram",
+            "number_of_staff",
+            "file_types",
+            "image_bucket",
+            "photo1",
+            "photo2",
+            "photo3",
+            "photo4",
+            "photo5",
+            "photo6",
+            "photo7",
+            "photo8",
+            "photo9",
+            "pinterest",
+            "portrait",
+            "sample_production",
+            "soft_delete",
+            "large_run",
+            "linkedin",
+            "video_link",
+        ]
+    )
     return (output,)
 
 
 @app.cell
 def __(now, output):
-    output.to_csv('data/source_06_' + now.strftime('%Y_%m_%d_%H%M') + '.csv')
+    output.to_csv("data/source_06_" + now.strftime("%Y_%m_%d_%H%M") + ".csv")
     return
 
 
@@ -131,7 +186,7 @@ def __(output):
 
 @app.cell
 def __(output):
-    print('OKW entries: {r[0]}, columns = {r[1]}'.format(r=output.shape))
+    print("OKW entries: {r[0]}, columns = {r[1]}".format(r=output.shape))
     return
 
 

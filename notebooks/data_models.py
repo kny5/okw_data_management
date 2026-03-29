@@ -1,11 +1,10 @@
-from marshmallow import Schema, fields, post_load, validate, EXCLUDE
+from marshmallow import Schema, fields, post_load, EXCLUDE
 import uuid
 
 
 class GeocodingSchema(Schema):
-
     geocoding_id = fields.Str(load_only=True)
-    format = fields.Str(default='EPSG:4326')
+    format = fields.Str(default="EPSG:4326")
     latitude = fields.Float(default=None)
     longitude = fields.Float(default=None)
     altitude = fields.Float(default=None)
@@ -17,13 +16,12 @@ class GeocodingSchema(Schema):
     @post_load
     def add_id(self, data, **kwargs):
         # Add a unique ID to the data
-        data['geocoding_id'] = str(uuid.uuid4())
+        data["geocoding_id"] = str(uuid.uuid4())
         # print('diag geo data:', data)
         return data
 
 
 class AddressSchema(Schema):
-
     address_id = fields.Str(load_only=True)
     zip_code = fields.Str(default=None)
     street = fields.Str(default=None)
@@ -33,13 +31,12 @@ class AddressSchema(Schema):
     @post_load
     def add_id(self, data, **kwargs):
         # Add a unique ID to the data
-        data['address_id'] = str(uuid.uuid4())
+        data["address_id"] = str(uuid.uuid4())
         # print('diag addr data:', data)
         return data
 
 
 class RegionSchema(Schema):
-
     region_id = fields.Str(load_only=True)
     country = fields.Str(allow_none=True, default=None, encode_utf8=True)
     state_region = fields.Str(allow_none=True, default=None, encode_utf8=True)
@@ -48,13 +45,12 @@ class RegionSchema(Schema):
     @post_load
     def add_id(self, data, **kwargs):
         # Add a unique ID to the data
-        data['region_id'] = str(uuid.uuid4())
+        data["region_id"] = str(uuid.uuid4())
         # print('diag reg data:', data)
         return data
 
 
 class LocationSchema(Schema):
-
     location_id = fields.Str(load_only=True)
     geocoding_id = fields.Str(allow_none=True, default=None)
     address_id = fields.Str(allow_none=True, default=None)
@@ -63,13 +59,12 @@ class LocationSchema(Schema):
     @post_load
     def add_id(self, data, **kwargs):
         # Add a unique ID to the data
-        data['location_id'] = str(uuid.uuid4())
+        data["location_id"] = str(uuid.uuid4())
         # print('diag loc data:', data)
         return data
 
 
 class FacilitySchema(Schema):
-
     facility_id = fields.Str(load_only=True)
     name = fields.Str(required=True)
     url = fields.Str(required=True)
@@ -80,7 +75,7 @@ class FacilitySchema(Schema):
     @post_load
     def add_id(self, data, **kwargs):
         # Add a unique ID to the data
-        data['facility_id'] = str(uuid.uuid4())
+        data["facility_id"] = str(uuid.uuid4())
         # print('diag fac data:', data)
         return data
 
@@ -91,19 +86,19 @@ class ParserSchema:
         __schema = GeocodingSchema()
 
         try:
-            __out = __schema.load(values,
-                                  # many=False,
-                                  partial=True,
-                                  unknown=EXCLUDE
-                                  )
+            __out = __schema.load(
+                values,
+                # many=False,
+                partial=True,
+                unknown=EXCLUDE,
+            )
             self.geocoding = __out
             # # print('geocod type:', self.geocoding)
             # print('geocod type:', __out)
 
-
             return True
 
-        except Exception as ex:
+        except Exception:
             # print('err geocoding', ex)
             self.geocoding = None
             return False
@@ -115,7 +110,7 @@ class ParserSchema:
             self.address = __out
             # print(self.address)
             return True
-        except Exception as ex:
+        except Exception:
             self.address = None
             # print(ex, 'err address')
             return False
@@ -127,7 +122,7 @@ class ParserSchema:
             self.region = __out
             # print(self.region)
             return True
-        except Exception as ex:
+        except Exception:
             self.region = None
             # print(ex, 'err region')
             return False
@@ -137,22 +132,25 @@ class ParserSchema:
 
         try:
             # print('diag set loc sch type:', self.geocoding)
-            __geocoding_id = self.geocoding['geocoding_id']
+            __geocoding_id = self.geocoding["geocoding_id"]
         except TypeError:
             __geocoding_id = None
 
         try:
-            __address_id = self.address['address_id']
+            __address_id = self.address["address_id"]
         except TypeError:
             __address_id = None
 
         try:
-            __region_id = self.region['region_id']
+            __region_id = self.region["region_id"]
         except TypeError:
             __region_id = None
 
-        __in = {'geocoding_id': __geocoding_id, 'address_id': __address_id,
-                'region_id': __region_id}
+        __in = {
+            "geocoding_id": __geocoding_id,
+            "address_id": __address_id,
+            "region_id": __region_id,
+        }
         # print('diag set loc')
         # print(__in)
 
@@ -171,7 +169,7 @@ class ParserSchema:
         self.facility = __out
         # not sure
         # print('diag set fac id')
-        self.facility['location_id'] = self.location['location_id']
+        self.facility["location_id"] = self.location["location_id"]
         return True
 
         # except Exception as ex:
@@ -189,8 +187,10 @@ class ParserSchema:
             self.set_location_schema()
             self.set_facility_schema(values)
 
-            return {'geocoding': self.geocoding,
-                    'address': self.address,
-                    'region': self.region,
-                    'location': self.location,
-                    'facility': self.facility}
+            return {
+                "geocoding": self.geocoding,
+                "address": self.address,
+                "region": self.region,
+                "location": self.location,
+                "facility": self.facility,
+            }
