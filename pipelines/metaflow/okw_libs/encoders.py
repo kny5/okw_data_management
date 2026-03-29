@@ -6,11 +6,10 @@ Created on Wed Nov 13 22:38:11 2024
 @author: kny5
 """
 
-
-
 import hashlib
-import unicodedata
 import re
+import unicodedata
+
 
 def normalize_text(text):
     """
@@ -18,12 +17,13 @@ def normalize_text(text):
     stripping whitespace, and removing non-alphanumeric characters.
     """
     text = str(text)
-    text = unicodedata.normalize('NFKD', text)
-    text = text.encode('ASCII', 'ignore').decode('ASCII')
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ASCII", "ignore").decode("ASCII")
     text = text.lower()
     text = text.strip()
-    text = re.sub(r'\W+', '', text)  # Remove non-alphanumeric characters
+    text = re.sub(r"\W+", "", text)  # Remove non-alphanumeric characters
     return text
+
 
 def generate_unique_identifier(row):
     """
@@ -31,34 +31,35 @@ def generate_unique_identifier(row):
     combining the specified fields and hashing them.
     """
     # Round latitude and longitude to 2 decimal places
-    lat = round(float(row['lat']), 2)
-    long = round(float(row['long']), 2)
-    
+    lat = round(float(row["lat"]), 2)
+    long = round(float(row["long"]), 2)
+
     # Convert rounded lat and long to strings
     lat_str = str(lat)
     long_str = str(long)
-    
+
     # Normalize the required fields
     lat_norm = normalize_text(lat_str)
     long_norm = normalize_text(long_str)
-    country = normalize_text(row['country'])  # Should be ISO alpha-2 code
-    name = normalize_text(row['name'])
-    town = normalize_text(row['town'])  # Replace with town code if available
-    type_ = normalize_text(row['type'])
-    
+    country = normalize_text(row["country"])  # Should be ISO alpha-2 code
+    name = normalize_text(row["name"])
+    town = normalize_text(row["town"])  # Replace with town code if available
+    type_ = normalize_text(row["type"])
+
     # Create a unique string by concatenating the normalized fields
     unique_string = f"{lat_norm}|{long_norm}|{country}|{name}|{town}|{type_}"
-    
+
     # Compute a SHA-256 hash of the unique string
-    uid_hash = hashlib.sha256(unique_string.encode('utf-8')).hexdigest()
-    
+    uid_hash = hashlib.sha256(unique_string.encode("utf-8")).hexdigest()
+
     # Truncate the hash to get a fixed-length UID (e.g., 12 characters)
     uid = uid_hash[:12]
-    
+
     # The unique identifier
     unique_identifier = f"{uid}"
-    
+
     return unique_identifier
+
 
 # # Sample DataFrame for demonstration
 # df = pd.DataFrame({

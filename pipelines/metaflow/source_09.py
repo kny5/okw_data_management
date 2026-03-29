@@ -6,41 +6,49 @@ Created on Thu Oct 31 07:51:41 2024
 @author: kny5
 """
 
-
-
-from metaflow import FlowSpec, step, card, Parameter
-import pandas as pd
-from __visualisations__ import Plot, Tabular
-from __functions__ import req_data, ReverseGeocode
 import json
+
+import pandas as pd
+from __functions__ import ReverseGeocode, req_data
+from __visualisations__ import Plot, Tabular
 from bs4 import BeautifulSoup as soup
+from metaflow import FlowSpec, Parameter, card, step
 
 
 class Source_09(FlowSpec):
-    
-    url = Parameter('url', default="https://wiki.hackerspaces.org/List_of_Hacker_Spaces")
-    
+    url = Parameter(
+        "url", default="https://wiki.hackerspaces.org/List_of_Hacker_Spaces"
+    )
+
     @step
     def start(self):
         self.next(self.extract)
-    
+
     @step
     def extract(self):
-        html_parser = soup(req_data(self.url).text, 'html.parser')
+        html_parser = soup(req_data(self.url).text, "html.parser")
         data = html_parser.find("div", {"class": "mapdata"}).text
         print(data)
         self.raw = json.loads(data).get("locations", [])
         self.data = pd.DataFrame(self.raw)
         print(self.data.columns.tolist())
         self.next(self.clean)
-        
+
     @step
     def clean(self):
-        self.data.rename(columns={'lat': 'latitude', 'lon': 'longitude', 'title': 'name', 'link': 'web_url'}, inplace=True)
-        self.output = self.data[['name','latitude','longitude', 'web_url']]
+        self.data.rename(
+            columns={
+                "lat": "latitude",
+                "lon": "longitude",
+                "title": "name",
+                "link": "web_url",
+            },
+            inplace=True,
+        )
+        self.output = self.data[["name", "latitude", "longitude", "web_url"]]
         self.next(self.transform)
-    
-    @card(type='html')
+
+    @card(type="html")
     @step
     def transform(self):
         self.geocode = ReverseGeocode(self.output).get()
@@ -50,32 +58,35 @@ class Source_09(FlowSpec):
     @step
     def visualise(self):
         self.next(self.data_table, self.data_map, self.data_stats)
-    
-    @card(type='html')
+
+    @card(type="html")
     @step
     def data_table(self):
         self.html = Tabular(self.output).table_output()
         self.next(self.wrapup)
-    
-    @card(type='html')
+
+    @card(type="html")
     @step
     def data_map(self):
-        self.html = Plot(self.output.dropna(subset=['latitude','longitude'])).render()
+        self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
         self.next(self.wrapup)
-        
+
     @step
     def data_stats(self):
-        self.count = "OKW entries: {r[0]}, columns: {r[1]}, info: {c}".format(r=self.output.shape, c=self.output.columns.tolist())
+        self.count = "OKW entries: {r[0]}, columns: {r[1]}, info: {c}".format(
+            r=self.output.shape, c=self.output.columns.tolist()
+        )
         self.next(self.wrapup)
-    
+
     @step
     def wrapup(self, inputs):
         self.output = inputs[0].output
         self.next(self.end)
-    
-    @step    
+
+    @step
     def end(self):
         print("Success")
+
 
 if __name__ == "__main__":
     Source_09()
