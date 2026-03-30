@@ -79,13 +79,7 @@ class JoinData01(FlowSpec):
             self.geocode["continent"].isin(["Africa", "Europe"])
         ]
         self.html = Plot(self.makeafricaeu, max_cluster_rad=30).render()
-        self.next(self.visualise)
-    
-    @card(type="html")
-    @step
-    def geopolitical_data(self):
-        self.geopol_data = source_geopol_data.get(regions=["world"], conflicts=["all_types"])
-        
+        self.next(self.visualise)    
 
     @step
     def visualise(self):
