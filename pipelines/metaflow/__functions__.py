@@ -394,3 +394,9 @@ def cluster_and_key_collision(df, distance_threshold=100, n=3):
     # Convert to DataFrame for output
     aggregated_df = pd.DataFrame(aggregated_data)
     return aggregated_df
+
+
+def extract_link(html_text):
+    # Search for an external https link
+    match = re.search(r'href="(https?://[^"]+)"', html_text)
+    return match.group(1) if match else None

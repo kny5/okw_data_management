@@ -9,15 +9,15 @@ Created on Thu Oct 31 07:51:41 2024
 import json
 
 import pandas as pd
-from __functions__ import ReverseGeocode, req_data
+from __functions__ import ReverseGeocode, extract_link
 from __visualisations__ import Plot, Tabular
 from bs4 import BeautifulSoup as soup
 from metaflow import FlowSpec, Parameter, card, step
 
 
 class Source_09(FlowSpec):
-    api_url = Parameter(
-        "url", default="https://wiki.hackerspaces.org/w/api.php?action=parse&oldid=95416&prop=text&format=json&origin=*"
+    url = Parameter(
+        "url", default="data/hackerspaces_list.json"
     )
 
     @step
@@ -26,52 +26,22 @@ class Source_09(FlowSpec):
 
     @step
     def extract(self):
-        print(f"Fetching from API: {self.api_url}")
-        
-        response = req_data(self.api_url)
-        
-        # DEBUG: Print the first 500 characters of whatever we got
-        print("--- RAW RESPONSE START ---")
-        print(response.text[:500])
-        print("--- RAW RESPONSE END ---")
-        
-        # This is where it's currently crashing
-        api_json = response.json()
-
-        # 3. Extract the HTML string from the 'parse' -> 'text' -> '*' path
-        raw_html = api_json.get('parse', {}).get('text', {}).get('*', '')
-        
-        if not raw_html:
-            print("Error: API response did not contain page text.")
-            self.data = pd.DataFrame()
-            self.next(self.clean)
-            return
-
-        # 4. Use BeautifulSoup to find the 'mapdata' div hidden in that HTML
+        with open(self.url, "r", encoding="utf-8") as f:
+            api_response = json.load(f)
+        raw_html = api_response.get("parse", {}).get("text", {}).get("*", "")
         html_parser = soup(raw_html, "html.parser")
-        div_data = html_parser.find("div", {"class": "mapdata"})
-
-        if not div_data:
-            print("Error: The 'mapdata' div was not found in the page HTML.")
-            self.data = pd.DataFrame()
-        else:
-            try:
-                # 5. Parse the INNER JSON string found inside the div
-                map_json = json.loads(div_data.text)
-                locations = map_json.get("locations", [])
-                
-                # 6. Convert to DataFrame
-                self.data = pd.DataFrame(locations)
-                print(f"Success! Extracted {len(self.data)} hackerspaces.")
-                
-            except json.JSONDecodeError:
-                print("Error: The text inside mapdata was not valid JSON.")
-                self.data = pd.DataFrame()
-
+        data = html_parser.find("div", {"class": "mapdata"}).text
+        print(data)
+        self.raw = json.loads(data).get("locations", [])
+        self.data = pd.DataFrame(self.raw)
+        print(self.data.columns.tolist())
         self.next(self.clean)
 
+    @card(type="html")
     @step
     def clean(self):
+        self.html = Tabular(self.data).table_output()
+        
         self.data.rename(
             columns={
                 "lat": "latitude",
@@ -81,6 +51,7 @@ class Source_09(FlowSpec):
             },
             inplace=True,
         )
+        self.data['web_url'] = self.data['text'].apply(extract_link)
         self.output = self.data[["name", "latitude", "longitude", "web_url"]]
         self.next(self.transform)
 
