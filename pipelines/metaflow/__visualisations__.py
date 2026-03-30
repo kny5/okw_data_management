@@ -36,87 +36,129 @@ def load_js_file(file_path):
         return file.read()
 
 
+import numpy as np
+import folium
+from folium.plugins import FastMarkerCluster, FloatImage, MeasureControl, LocateControl, Fullscreen, HeatMap
+
+# Assuming load_js_file is defined elsewhere in your script
+# from __functions__ import load_js_file 
+
 class Plot:
-    def __init__(self, dataframe, max_cluster_rad=40):
+    def __init__(self, dataframe, lat_col="latitude", lon_col="longitude", popup_cols=None, weight_col=None, plot_type="cluster", max_cluster_rad=40):
+        """
+        :param dataframe: The pandas DataFrame containing geo data.
+        :param lat_col: Name of the latitude column (default: "latitude").
+        :param lon_col: Name of the longitude column (default: "longitude").
+        :param popup_cols: List of column names to pass to the JS callback for popups (used in 'cluster' mode).
+        :param weight_col: Column name to use for heatmap intensity (used in 'heatmap' mode).
+        :param plot_type: Choose "cluster" or "heatmap".
+        :param max_cluster_rad: Maximum radius for the marker cluster.
+        """
+        self.data = dataframe.copy()
+        self.lat_col = lat_col
+        self.lon_col = lon_col
+        self.weight_col = weight_col
+        self.plot_type = plot_type.lower()
+        self.popup_cols = popup_cols if popup_cols is not None else []
+        self.max_rad = max_cluster_rad
+        
+        # Assets 
         self.icon_cluster = load_js_file("pipelines/metaflow/assets/cluster_icon.js")
         self.callback = load_js_file("pipelines/metaflow/assets/cluster_mod.js")
-        # self.tiles_url = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
         self.tiles_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
         self.tiles_attribution = "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012"
-        self.data = dataframe
-        self.max_rad = max_cluster_rad
+        
         self.prep_data()
         self.set_map()
         self.add_points()
         self.add_legend()
 
     def prep_data(self):
-        self.output_map = self.data.dropna(subset=["latitude", "longitude"])
-        print(self.output_map.info(verbose=True))
-        # self.zip_data = [(row['latitude'], row['longitude'], row['name']
-        #              # row['url'],
-        #              # row['email']
-        #              )
-        #             for index, row in self.output_map.iterrows()]
-        try:
-            self.zip_data = list(
-                zip(
-                    self.output_map["latitude"],
-                    self.output_map["longitude"],
-                    self.output_map["name"],
-                    self.output_map["web_url"],
-                )
-            )
-        except KeyError:
-            self.zip_data = list(
-                zip(
-                    self.output_map["latitude"],
-                    self.output_map["longitude"],
-                    self.output_map["name"],
-                    str(self.output_map["occurrences"]),
-                )
-            )
-        self.bounds = [
-            [self.output_map["latitude"].min(), self.output_map["longitude"].min()],
-            [self.output_map["latitude"].max(), self.output_map["longitude"].max()],
-        ]
+        # Safely drop rows missing coordinates
+        self.output_map = self.data.dropna(subset=[self.lat_col, self.lon_col])
+        print(f"Data summary for mapping ({len(self.output_map)} valid rows):")
+        
+        # Prepare data for Cluster mode
+        extract_columns = [self.lat_col, self.lon_col] + self.popup_cols
+        missing_cols = [col for col in self.popup_cols if col not in self.output_map.columns]
+        if missing_cols:
+            print(f"Warning: The following popup columns were not found in the dataframe: {missing_cols}")
+            extract_columns = [col for col in extract_columns if col not in missing_cols]
+
+        self.zip_data = self.output_map[extract_columns].values.tolist()
+
+        # Prepare data for Heatmap mode
+        if self.plot_type == "heatmap":
+            if self.weight_col and self.weight_col in self.output_map.columns:
+                # Drop rows where the weight is NaN to avoid breaking the heatmap
+                heat_df = self.output_map.dropna(subset=[self.weight_col])
+                self.heat_data = heat_df[[self.lat_col, self.lon_col, self.weight_col]].values.tolist()
+            else:
+                if self.weight_col:
+                    print(f"Warning: Weight column '{self.weight_col}' not found. Defaulting to density heatmap.")
+                # If no weight column is provided, HeatMap just calculates density based on coordinates
+                self.heat_data = self.output_map[[self.lat_col, self.lon_col]].values.tolist()
+
+        # Safely calculate map bounds
+        if not self.output_map.empty:
+            self.bounds = [
+                [self.output_map[self.lat_col].min(), self.output_map[self.lon_col].min()],
+                [self.output_map[self.lat_col].max(), self.output_map[self.lon_col].max()],
+            ]
+        else:
+            self.bounds = [[0, 0], [0, 0]]
 
     def set_map(self):
-        # Check for NaN values in latitude and longitude before creating the
-        # map
-        if (
-            not np.isnan(self.output_map["latitude"]).any()
-            and not np.isnan(self.output_map["longitude"]).any()
-        ):
+        if not self.output_map.empty:
             self.m = folium.Map(
                 location=[
-                    self.output_map["latitude"].mean(),
-                    self.output_map["longitude"].mean(),
+                    self.output_map[self.lat_col].mean(),
+                    self.output_map[self.lon_col].mean(),
                 ],
-                zoom_start=1,
+                zoom_start=2, # Zoomed out slightly more for heatmaps
                 tiles=self.tiles_url,
                 attr=self.tiles_attribution,
                 max_zoom=15,
-                # worldCopyJump= False,
                 zoomControl=False,
                 prefer_canvas=True,
             )
             self.m.fit_bounds(self.bounds)
         else:
-            print("Location values cannot contain NaNs.")
+            print("Cannot generate map: No valid location values found.")
+            self.m = folium.Map(location=[0,0], zoom_start=2, tiles=self.tiles_url, attr=self.tiles_attribution)
 
     def add_points(self):
-        FastMarkerCluster(
-            data=self.zip_data,
-            icon_create_function=self.icon_cluster,
-            callback=self.callback,
-            options={"singleMarkerMode": True, "maxClusterRadius": self.max_rad},
-        ).add_to(self.m)
+        if not hasattr(self, 'zip_data') or not self.zip_data:
+            return
+
+        if self.plot_type == "heatmap":
+            # Add the HeatMap layer
+            HeatMap(
+                self.heat_data,
+                radius=12,      # Size of the heat points
+                blur=15,        # Smoothness of the gradients
+                max_zoom=10,    # At what zoom level the points reach maximum intensity
+            ).add_to(self.m)
+        else:
+            # Add the standard Marker Cluster layer
+            FastMarkerCluster(
+                data=self.zip_data,
+                icon_create_function=self.icon_cluster,
+                callback=self.callback,
+                options={"singleMarkerMode": True, "maxClusterRadius": self.max_rad},
+            ).add_to(self.m)
 
     def add_legend(self):
-        with open("pipelines/metaflow/assets/legend.html", "r") as f:
-            legend_html = f.read()
-        self.m.get_root().html.add_child(folium.Element(legend_html))
+        # We skip the standard cluster legend if we are drawing a heatmap
+        if self.plot_type == "heatmap":
+            return
+            
+        try:
+            with open("pipelines/metaflow/assets/legend.html", "r") as f:
+                legend_html = f.read()
+            self.m.get_root().html.add_child(folium.Element(legend_html))
+        except FileNotFoundError:
+            print("Warning: 'legend.html' not found. Skipping legend generation.")
 
     def render(self):
         FloatImage(
@@ -125,7 +167,6 @@ class Plot:
             left=3,
         ).add_to(self.m)
         MeasureControl(position="bottomright").add_to(self.m)
-        # Geocoder(position="topleft").add_to(self.m)
         LocateControl(position="topleft").add_to(self.m)
         Fullscreen(
             position="topright",
@@ -133,6 +174,7 @@ class Plot:
             title_cancel="Exit",
             force_separate_button=True,
         ).add_to(self.m)
+        
         return self.m.get_root().render()
 
 
