@@ -11,7 +11,7 @@ Created on Mon Oct 28 06:17:15 2024
 # run merge join strategy on each workspace/tag
 
 import pandas as pd
-from __functions__ import ReverseGeocode, cluster_and_aggregate, source_geopol_data
+from __functions__ import ReverseGeocode, cluster_and_aggregate
 from __visualisations__ import Plot, Tabular
 from metaflow import Flow, FlowSpec, card, resources, step, catch
 
