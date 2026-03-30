@@ -18,7 +18,7 @@ from metaflow import Flow, FlowSpec, card, resources, step, catch
 
 class JoinData01(FlowSpec):
 
-    @catch(var='failure')
+    # @catch(var='failure')
     @resources(memory=8000, cpu=11, gpu=1)
     @step
     def start(self):
@@ -27,7 +27,7 @@ class JoinData01(FlowSpec):
             "Source_02",
             "Source_03",
             "Source_04",
-            "Source_05",
+            # "Source_05",
             "Source_06",
             "Source_07",
             "Source_08",
