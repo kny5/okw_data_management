@@ -87,22 +87,22 @@ class JoinData01(FlowSpec):
         # self.output = cluster_and_key_collision(filter_0, distance_threshold=6000, n=2)
         # self.output = filter_0[~filter_0.isin(filter_1).all(axis=1)]
         self.output = filter_1
-        self.next(self.project_make_africa_eu, self.visualise)
+        self.next(self.visualise)
+    
+    @step
+    def visualise(self):
+        self.next(self.data_table, self.data_map, self.data_stats, self.make_africa_eu)
 
     @card(type="html")
     @step
-    def project_make_africa_eu(self):
+    def make_africa_eu(self):
         self.geocode = ReverseGeocode(self.output).get()
         # self.html = Tabular(self.geocode).table_output()
         self.makeafricaeu = self.geocode[
             self.geocode["continent"].isin(["Africa", "Europe"])
         ]
         self.html = Plot(self.makeafricaeu, max_cluster_rad=30).render()
-        self.next(self.visualise)
-
-    @step
-    def visualise(self):
-        self.next(self.data_table, self.data_map, self.data_stats)
+        self.next(self.wrap_up)
 
     @card(type="html")
     @step
