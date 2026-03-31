@@ -31,7 +31,7 @@ class Source_09(FlowSpec):
         raw_html = api_response.get("parse", {}).get("text", {}).get("*", "")
         html_parser = soup(raw_html, "html.parser")
         data = html_parser.find("div", {"class": "mapdata"}).text
-        print(data)
+        # print(data)
         self.raw = json.loads(data).get("locations", [])
         self.data = pd.DataFrame(self.raw)
         print(self.data.columns.tolist())

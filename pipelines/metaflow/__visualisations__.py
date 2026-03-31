@@ -51,6 +51,7 @@ class Plot:
         self.set_map()
         self.add_points()
         self.add_legend()
+        self.add_count()
 
     def prep_data(self):
         self.output_map = self.data.dropna(subset=["latitude", "longitude"])
@@ -119,6 +120,11 @@ class Plot:
         with open("pipelines/metaflow/assets/legend.html", "r") as f:
             legend_html = f.read()
         self.m.get_root().html.add_child(folium.Element(legend_html))
+    
+    def add_count(self):
+        with open("pipelines/metaflow/assets/count.html", "r") as f:
+            count_html = f.read()
+        self.m.get_root().html.add_child(folium.Element(count_html))
 
     def render(self):
         FloatImage(
