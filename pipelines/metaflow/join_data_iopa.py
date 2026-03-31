@@ -13,11 +13,11 @@ Created on Mon Oct 28 06:17:15 2024
 import pandas as pd
 from __functions__ import ReverseGeocode, cluster_and_aggregate
 from __visualisations__ import Plot, Tabular
-from metaflow import Flow, FlowSpec, card, resources, step, catch
+from metaflow import Flow, FlowSpec, card, resources, step, NBRunner
 
 
 class JoinData01(FlowSpec):
-
+    
     # @catch(var='failure')
     @resources(memory=8000, cpu=11, gpu=1)
     @step
@@ -36,14 +36,32 @@ class JoinData01(FlowSpec):
             "Source_11",
             "Source_12",
         ]
-        self.next(self.get_data, foreach="sources")
+        
+        self.next(self.get_or_generate_data, foreach="sources")
 
     @step
-    def get_data(self):
-        print(self.input)
-        # Access the 'output' attribute of the latest run in each source
+    def get_or_generate_data(self):
+        source_name = self.input
+        print(f"Processing source: {source_name}")
+        
+        try:
+            # First, try to get the existing data
+            # (Note: make sure 'Flow' is imported properly in your actual file)
+            self.data = Flow(source_name).latest_successful_run.data.output
+            print(f"Successfully fetched existing data for {source_name}")
+            
+        except Exception as e:
+            # If it fails (e.g., flow hasn't run yet), catch the error and run the notebook
+            print(f"Data fetch failed for {source_name} with error: {e}. Running notebook...")
+            
+            # Assuming NBRunner is imported and runs synchronously
+            NBRunner(Flow(source_name))
+            
+            # Try fetching the data again after the notebook finishes
+            self.data = Flow(source_name).latest_successful_run.data.output
+            print(f"Successfully fetched newly generated data for {source_name}")
 
-        self.data = Flow(self.input).latest_successful_run.data.output
+        # Move to the join step
         self.next(self.concatenate)
 
     @step
@@ -57,6 +75,7 @@ class JoinData01(FlowSpec):
 
     @step
     def clean(self):
+        # Drop duplicates by latitude and longitude
         # .drop_duplicates(subset=['name', 'latitude', 'longitude'], keep='last')
         filter_0 = self.append_source.dropna(subset=["latitude", "longitude"])
         # filter_a = clean_and_cluster_records(filter_0, distance_threshold=6000, name_similarity_threshold=0.8)
@@ -68,22 +87,21 @@ class JoinData01(FlowSpec):
         # self.output = cluster_and_key_collision(filter_0, distance_threshold=6000, n=2)
         # self.output = filter_0[~filter_0.isin(filter_1).all(axis=1)]
         self.output = filter_1
-        self.next(self.transform)
+        self.next(self.project_make_africa_eu, self.visualise)
 
     @card(type="html")
     @step
-    def transform(self):
+    def project_make_africa_eu(self):
         self.geocode = ReverseGeocode(self.output).get()
         # self.html = Tabular(self.geocode).table_output()
         self.makeafricaeu = self.geocode[
             self.geocode["continent"].isin(["Africa", "Europe"])
         ]
         self.html = Plot(self.makeafricaeu, max_cluster_rad=30).render()
-        self.next(self.visualise)    
+        self.next(self.visualise)
 
     @step
     def visualise(self):
-        # Drop duplicates by latitude and longitude
         self.next(self.data_table, self.data_map, self.data_stats)
 
     @card(type="html")

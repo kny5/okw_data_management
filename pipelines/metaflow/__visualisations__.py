@@ -27,6 +27,8 @@ from folium.plugins import (
     MeasureControl,
 )
 from itables import to_html_datatable
+from bs4 import BeautifulSoup as bs
+
 
 opt.maxBytes = 0
 
@@ -152,6 +154,91 @@ class Tabular:
         )
         return table_html
 
+def extract_map_data_from_string(html_string, js_filename="cluster_data.js"):
+    """
+    Parses an HTML string, extracts the map data script containing 'var data =', 
+    and updates the HTML to link to an external JS file.
+    
+    Returns:
+        tuple: (modified_html_string, extracted_js_content)
+               If the specific script is not found, extracted_js_content will be None.
+    """
+    # 1. Parse the HTML string directly
+    soup = bs(html_string, 'html.parser')
+
+    # 2. Find the target <script> tag containing 'var data ='
+    target_script = None
+    for script in soup.find_all('script'):
+        if script.string and 'var data =' in script.string:
+            target_script = script
+            break
+
+    # 3. Handle the case where the data isn't found
+    if not target_script:
+        print("Could not find a script block containing 'var data ='.")
+        # Return the original HTML untouched, and None for the JS
+        return html_string, None
+
+    # 4. Extract the JavaScript content
+    js_content = target_script.string.strip()
+
+    # 5. Modify the HTML script tag to point to the external file
+    target_script.string = ""  # Clear the inline data
+    target_script['src'] = js_filename  # Link to the external file
+    target_script['defer'] = "true" # Ensure it loads after the HTML
+
+    # 6. Return the updated HTML string and the raw JS string
+    return str(soup), js_content
+
+
+def extract_map_data_to_js(html_filepath, output_js_filename="map_data.js"):
+    """
+    Extracts a specific script block containing 'var data =' from an HTML file, 
+    saves it to an external .js file, and links it back to the HTML.
+    """
+    print(f"Processing: {html_filepath}...")
+
+    # 1. Read the HTML file
+    try:
+        with open(html_filepath, 'r', encoding='utf-8') as file:
+            soup = BeautifulSoup(file, 'html.parser')
+    except FileNotFoundError:
+        print(f"Error: Could not find the file {html_filepath}")
+        return
+
+    # 2. Find the target <script> tag containing 'var data ='
+    target_script = None
+    for script in soup.find_all('script'):
+        # We check if the script has text inside and contains our specific variable
+        if script.string and 'var data =' in script.string:
+            target_script = script
+            break
+
+    if not target_script:
+        print("Could not find a script block containing 'var data ='. No changes made.")
+        return
+
+    # 3. Extract the JavaScript content
+    js_content = target_script.string.strip()
+
+    # 4. Save the JS content to the external file
+    directory = os.path.dirname(html_filepath)
+    js_filepath = os.path.join(directory, output_js_filename)
+    
+    with open(js_filepath, 'w', encoding='utf-8') as js_file:
+        js_file.write(js_content)
+    
+    print(f"Successfully saved data to: {js_filepath}")
+
+    # 5. Modify the HTML to point to the new external JS file
+    target_script.string = ""  # Clear the massive inline data
+    target_script['src'] = output_js_filename  # Link to the new file
+
+    # 6. Save the modified HTML back to the original file
+    with open(html_filepath, 'w', encoding='utf-8') as file:
+        file.write(str(soup))
+        
+    print(f"Successfully updated HTML file to link to {output_js_filename}.")
 
 # print(output["country_code"].value_counts().nlargest(10))
 

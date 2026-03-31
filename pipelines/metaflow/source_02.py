@@ -76,7 +76,7 @@ class Source_02(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        self.html = Plot(self.output).render()
+        self.htm = Plot(self.output).render()
         self.next(self.wrapup)
 
     @step
