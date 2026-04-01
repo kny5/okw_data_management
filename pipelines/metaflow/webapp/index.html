@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Dashboard</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        nav { background: #2c3e50; color: white; padding: 1rem; display: flex; gap: 20px; }
+        nav button { 
+            background: transparent; border: 1px solid white; color: white; 
+            padding: 8px 16px; cursor: pointer; border-radius: 4px;
+        }
+        nav button.active { background: white; color: #2c3e50; font-weight: bold; }
+        .content-area { flex-grow: 1; border: none; width: 100%; height: 100%; }
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <nav>
+            <button :class="{ active: currentPage === 'map' }" @click="currentPage = 'map'">
+                Map View
+            </button>
+            <button :class="{ active: currentPage === 'table' }" @click="currentPage = 'table'">
+                Data Table
+            </button>
+        </nav>
+
+        <main class="content-area">
+            <iframe v-show="currentPage === 'map'" src="map.html"></iframe>
+            <iframe v-show="currentPage === 'table'" src="table.html"></iframe>
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref } = Vue
+        createApp({
+            setup() {
+                const currentPage = ref('map')
+                return { currentPage }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

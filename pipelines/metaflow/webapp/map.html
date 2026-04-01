@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_8043741771f2bbdfe844c7caa52ecda8 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+    <script src="https://cdn.jsdelivr.net/gh/python-visualization/folium@main/folium/templates/leaflet_heat.min.js"></script>
+    
+                <style>
+                    #float_image_c548e1dc86ec64776c56a6dce7893bab {
+                        position: absolute;
+                        bottom: 3%;
+                        left: 3%;
+                        }
+                </style>
+            
+    <script src="https://cdn.jsdelivr.net/gh/ljagis/leaflet-measure@2.1.7/dist/leaflet-measure.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/ljagis/leaflet-measure@2.1.7/dist/leaflet-measure.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-locatecontrol/0.66.2/L.Control.Locate.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-locatecontrol/0.66.2/L.Control.Locate.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@3.0.0/Control.FullScreen.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@3.0.0/Control.FullScreen.css"/>
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_8043741771f2bbdfe844c7caa52ecda8" ></div>
+        
+    
+            <img id="float_image_c548e1dc86ec64776c56a6dce7893bab" alt="float_image"
+                 src="https://github.com/iop-alliance/data_reports/blob/main/assets/img/iopa_logo_okw_sm.png?raw=true"
+                 style="z-index: 999999">
+            </img>
+            
+</body>
+<script>
+    
+    
+            var map_8043741771f2bbdfe844c7caa52ecda8 = L.map(
+                "map_8043741771f2bbdfe844c7caa52ecda8",
+                {
+                    center: [14.747805872807017, 47.10906769395017],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 2,
+  "zoomControl": true,
+  "preferCanvas": true,
+  "zoomControl": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_fd3b51fefdd1c194c18310bd564fce2f = L.tileLayer(
+                "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+                {
+  "minZoom": 0,
+  "maxZoom": 15,
+  "maxNativeZoom": 15,
+  "noWrap": false,
+  "attribution": "Tiles \u0026copy; Esri \u0026mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_fd3b51fefdd1c194c18310bd564fce2f.addTo(map_8043741771f2bbdfe844c7caa52ecda8);
+        
+    
+            map_8043741771f2bbdfe844c7caa52ecda8.fitBounds(
+                [[-31.589075, -117.0244313], [49.8591058, 136.5084106]],
+                {}
+            );
+        
+    
+            var heat_map_92e53b82af26c76d5239b86608cc9174 = L.heatLayer(
+                [[6.1701144, 37.2620697, 2.0], [-0.5645647, 28.7061945, 2.0], [-20.1561586, 34.738304, 2.0], [-23.4735288, 29.3959199, 2.0], [-23.4735288, 29.3959199, 2.0], [-23.4735288, 29.3959199, 2.0], [-8.7892855, 117.146169, 2.0], [13.8284014, 100.5683792, 2.0], [13.8284014, 100.5683792, 2.0], [13.8284014, 100.5683792, 3.0], [13.8284014, 100.5683792, 3.0], [13.8284014, 100.5683792, 3.0], [7.214308, 80.6400801063068, 2.0], [6.3344846, 101.1409694, 2.0], [20.3700559, -76.4272225, 2.0], [13.7542229, 5.6574918, 2.0], [31.3677822, 76.6203330691771, 2.0], [26.9399704, 87.924784, 2.0], [12.833333, 44.916667, 2.0], [22.350627, 114.1849161, 3.0], [34.8986215, -117.0244313, 2.0], [9.0, 33.0, 2.0], [34.0019893, 71.4805341599303, 2.0], [40.7419202, 107.3819572, 2.0], [17.0555286, -25.1723049, 2.0], [15.5919971, 120.739674572193, 2.0], [15.5919971, 120.739674572193, 2.0], [8.4860705, 124.656805038131, 2.0], [33.712802, 71.2678805, 2.0], [-0.7860696, 18.029460944233, 2.0], [-31.589075, 28.789145, 2.0], [9.2957202, 5.0544281, 2.0], [-3.2653155, 27.8705717, 2.0], [-16.5063698, -68.1080335, 2.0], [-5.9010019, 29.1778624, 2.0], [12.7503486, 122.7312101, 2.0], [39.4177902, -2.6232332, 2.0], [20.5431241, 84.6897321, 3.0], [13.5820827, 14.3788329, 2.0], [45.11796715, 17.0022251875, 2.0], [28.3780464, 83.9999901, 2.0], [49.8591058, 16.9561267467493, 2.0], [49.8591058, 16.9561267467493, 2.0], [49.8591058, 16.9561267467493, 2.0], [49.8591058, 16.9561267467493, 2.0], [49.8591058, 16.9561267467493, 2.0], [49.8591058, 16.9561267467493, 2.0], [27.1303344, 80.859666, 2.0], [8.7912006, 33.820323725, 2.0], [-4.4910206, 136.5084106, 2.0], [35.9261784, 64.6237758, 2.0], [-8.1356327, -35.8566421, 2.0], [-1.2832533, 36.8172449, 2.0], [-2.9666868, 29.1943658, 2.0], [8.9901969, 35.8239985, 2.0], [-6.8160837, 39.2803583, 2.0], [47.6605827, 50.806203, 2.0]],
+                {
+  "minOpacity": 0.5,
+  "maxZoom": 10,
+  "radius": 12,
+  "blur": 15,
+}
+            );
+        
+    
+            heat_map_92e53b82af26c76d5239b86608cc9174.addTo(map_8043741771f2bbdfe844c7caa52ecda8);
+        
+    
+            var measure_control_cc4fadcd20c76d20b34f271a2db25a7a = new L.Control.Measure(
+                {
+  "position": "bottomright",
+  "primaryLengthUnit": "meters",
+  "secondaryLengthUnit": "miles",
+  "primaryAreaUnit": "sqmeters",
+  "secondaryAreaUnit": "acres",
+});
+            map_8043741771f2bbdfe844c7caa52ecda8.addControl(measure_control_cc4fadcd20c76d20b34f271a2db25a7a);
+
+            // Workaround for using this plugin with Leaflet>=1.8.0
+            // https://github.com/ljagis/leaflet-measure/issues/171
+            L.Control.Measure.include({
+                _setCaptureMarkerIcon: function () {
+                    // disable autopan
+                    this._captureMarker.options.autoPanOnFocus = false;
+                    // default function
+                    this._captureMarker.setIcon(
+                        L.divIcon({
+                            iconSize: this._map.getSize().multiplyBy(2)
+                        })
+                    );
+                },
+            });
+
+        
+    
+            var locate_control_a0830ec716549023407149927527769a = L.control.locate(
+                {"position": "topleft"}
+            ).addTo(map_8043741771f2bbdfe844c7caa52ecda8);
+            
+        
+    
+            L.control.fullscreen(
+                {
+  "position": "topright",
+  "title": "Fullscreen",
+  "titleCancel": "Exit",
+  "forceSeparateButton": true,
+}
+            ).addTo(map_8043741771f2bbdfe844c7caa52ecda8);
+        
+</script>
+</html>
