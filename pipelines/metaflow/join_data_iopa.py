@@ -11,7 +11,7 @@ Created on Mon Oct 28 06:17:15 2024
 # run merge join strategy on each workspace/tag
 
 import pandas as pd
-from __functions__ import ReverseGeocode, cluster_and_aggregate
+from __functions__ import ReverseGeocode, cluster_and_aggregate, obfuscate_text, inject_secure_map_logic, generate_blake2_uid
 from __visualisations__ import Plot, Tabular
 from metaflow import Flow, FlowSpec, card, resources, step, NBRunner
 
@@ -87,6 +87,17 @@ class JoinData01(FlowSpec):
         # self.output = cluster_and_key_collision(filter_0, distance_threshold=6000, n=2)
         # self.output = filter_0[~filter_0.isin(filter_1).all(axis=1)]
         self.output = filter_1
+        self.next(self.protect)
+
+    @step
+    def protect(self):
+        self.output["name"] = self.output["name"].apply(lambda x: obfuscate_text(x, key="kny5"))
+        self.output["web_url"] = self.output["web_url"].apply(lambda x: obfuscate_text(x, key="kny5"))
+        self.next(self.give_uid)
+
+    @step
+    def give_uid(self):
+        self.output['uid'] = self.output.apply(generate_blake2_uid, axis=1)
         self.next(self.geocoding)
     
     @step
@@ -143,8 +154,18 @@ class JoinData01(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        # Generate map visualization
-        self.html = Plot(self.output, max_cluster_rad=30).render()
+        # 2. Generate the giant encrypted string payload
+        json_string = self.output[['latitude', 'longitude', 'name', 'web_url']].to_json(orient='records')
+        final_payload = obfuscate_text(json_string, key="kny5")
+
+        # 3. Generate the standard Folium map HTML
+        raw_html = Plot(self.output, max_cluster_rad=30).render()
+
+        # 4. RUN OUR AUTOMATION SCRIPT
+        # This scrubs the plaintext from raw_html and injects the Javascript
+        self.html = inject_secure_map_logic(raw_html, final_payload)
+
+        # 5. The card will now display the secure map
         self.next(self.wrap_up)
 
     @card(type="html")

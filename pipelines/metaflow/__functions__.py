@@ -11,6 +11,10 @@ import logging
 import re
 import unicodedata
 from time import sleep
+from hashlib import blake2b
+import base64
+
+import _blake2
 
 import numpy as np
 import pandas as pd
@@ -381,13 +385,14 @@ def cluster_and_key_collision(df, distance_threshold=100, n=3):
             first_row = group.iloc[0]
 
             # Collect URLs and sources for each entry with the same fingerprint
-            # occurrences = group[['url', 'source']].to_dict(orient='records')
+            occurrences = group[['url', 'source']].to_dict(orient='records')
+            print(occurrences.shape)
             aggregated_data.append(
                 {
                     "name": first_row["name"],
                     "latitude": first_row["latitude"],
                     "longitude": first_row["longitude"],
-                    # 'occurrences': occurrences
+                    'occurrences': occurrences
                 }
             )
 
@@ -400,3 +405,179 @@ def extract_link(html_text):
     # Search for an external https link
     match = re.search(r'href="(https?://[^"]+)"', html_text)
     return match.group(1) if match else None
+
+
+# This must match the key in your JavaScript!
+SECRET_KEY = "kny5"
+
+def obfuscate_text(text, key=SECRET_KEY):
+    # 1. Flatten lists or numpy arrays into a single string
+    if isinstance(text, (list, tuple, set)):
+        text = ", ".join([str(item) for item in text])
+    elif hasattr(text, '__iter__') and not isinstance(text, str):
+        # Catches other iterables like numpy arrays
+        text = ", ".join([str(item) for item in text])
+        
+    # 2. Now that we guarantee 'text' is a single value or string, 
+    # we can safely check for NaNs
+    if pd.isna(text): 
+        return ""
+        
+    # 3. Check for empty strings after cleaning
+    if not str(text).strip():
+        return ""
+        
+    # 4. Convert to bytes AFTER cleaning!
+    text_bytes = str(text).encode('utf-8')
+    key_bytes = key.encode('utf-8')
+        
+    # 5. Encrypt!
+    xored = bytes([b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(text_bytes)])
+    return base64.b64encode(xored).decode('utf-8')
+
+def generate_blake2_uid(row):
+    """Generates a Blake2 hash for a given row."""
+    # Concatenate values with a separator to avoid collisions (e.g., hash('01') == hash('0'+'1'))
+    # Ensure all values are converted to string
+    combined_string = f"{row['latitude']}:{row['longitude']}:{row['name']}"
+    # Encode the string to bytes before hashing
+    encoded_string = combined_string.encode('utf-8')
+    # Calculate the Blake2 hash and return the hexadecimal digest
+    return blake2b(encoded_string, digest_size=8).hexdigest()
+
+
+def inject_secure_map_logic(html_string, encrypted_payload):
+    """
+    Erases the plaintext data, injects a password UI overlay, 
+    and decrypts the map data purely based on user input.
+    """
+    
+    # 1. WIPE THE PLAINTEXT DATA
+    cleansed_html = re.sub(
+        r"var\s+data\s*=\s*\[.*?\];", 
+        "var data = []; /* Plaintext wiped by Python Encryptor */", 
+        html_string, 
+        flags=re.DOTALL
+    )
+
+    # 2. PREPARE THE SECURE JAVASCRIPT & UI OVERLAY
+    secure_js = f"""
+    <div id="secure-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 99999; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; font-family: sans-serif;">
+        <div style="background: white; padding: 30px; border-radius: 8px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 300px;">
+            <h3 style="margin-top: 0; color: #333;">Secure Map</h3>
+            <p style="font-size: 14px; color: #666;">Please enter the decryption key to view this data.</p>
+            <input type="password" id="map-key-input" style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px;" placeholder="Enter Key..." />
+            <button id="unlock-btn" style="width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Unlock Map</button>
+            <p id="error-msg" style="color: red; font-size: 13px; display: none; margin-bottom: 0;">Incorrect key. Please try again.</p>
+        </div>
+    </div>
+
+    <script>
+    function decryptData(b64Text, key) {{
+        try {{
+            if (!b64Text) return "";
+            
+            while (b64Text.length % 4 !== 0) {{
+                b64Text += "=";
+            }}
+            
+            let binaryStr = atob(b64Text);
+            
+            let keyBytes = new TextEncoder().encode(key);
+            
+            let xoredBytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) {{
+                xoredBytes[i] = binaryStr.charCodeAt(i) ^ keyBytes[i % keyBytes.length];
+            }}
+            return new TextDecoder().decode(xoredBytes);
+        }} catch (e) {{
+            return "Decryption Error";
+        }}
+    }}
+
+    // --- 2. UI INTERACTION & RENDERING LOGIC ---
+    document.getElementById('unlock-btn').addEventListener('click', function() {{
+        let userSecretKey = document.getElementById('map-key-input').value;
+        let rawJsonString = decryptData("{encrypted_payload}", userSecretKey);
+        
+        let mapData;
+        
+        // --- TEST 1: IS THE JSON VALID? ---
+        try {{
+            // Snip both leading AND trailing garbage just in case
+            let cleanJsonString = rawJsonString.substring(rawJsonString.indexOf('['), rawJsonString.lastIndexOf(']') + 1);
+            mapData = JSON.parse(cleanJsonString);
+            
+        }} catch (parseError) {{
+            // If it fails here, the password was genuinely wrong
+            console.error("Password failed or JSON is corrupt:", parseError);
+            document.getElementById('error-msg').style.display = 'block';
+            return; // Stop the script
+        }}
+
+        // --- IF WE REACH HERE, THE PASSWORD IS CORRECT! ---
+        document.getElementById('secure-overlay').style.display = 'none'; // Hide the login box
+        
+        // --- TEST 2: IS THE MAP CRASHING? ---
+        try {{
+            renderSecureMap(mapData, userSecretKey);
+        }} catch (renderError) {{
+            // If it fails here, your custom JS or Leaflet is crashing!
+            console.error("The map crashed while trying to draw the pins:");
+            console.error(renderError);
+        }}
+    }});
+
+    document.getElementById('map-key-input').addEventListener('keypress', function(e) {{
+        if (e.key === 'Enter') document.getElementById('unlock-btn').click();
+    }});
+
+    function renderSecureMap(mapData, validKey) {{
+        var myMap;
+        for (var key in window) {{
+            if (window[key] && window[key] instanceof L.Map) {{
+                myMap = window[key];
+                break;
+            }}
+        }}
+        
+        if (!myMap) return;
+
+        let secureCluster = L.markerClusterGroup({{ maxClusterRadius: 40 }});
+
+        for (let i = 0; i < mapData.length; i++) {{
+            let row = mapData[i];
+            
+            if (!row.latitude || !row.longitude) continue;
+
+            // 1. BRIDGE TO YOUR EXTERNAL JS:
+            // Format the object back into the array your script expects
+            let marker = L.marker([row.latitude, row.longitude]);
+            marker.bindPopup("<div style='font-family: monospace; color: #888;'>Decrypting...</div>");
+
+            // 3. SECURE OVERRIDE: 
+            // Intercept the click to decrypt the text and rewrite the popup on the fly
+            marker.on('click', function(e) {{
+                let popup = e.target.getPopup();
+                
+                let realName = decryptData(row.name, validKey);
+                let realUrl = decryptData(row.web_url, validKey);
+
+                // Rebuild your exact jQuery template with the clean text
+                let secureContent = $(`<div id='pop_content' class='pop_custom' style='width: 100.0%; height: 100.0%;'>
+                                        <a href="${{realUrl}}" target="_blank"><strong>${{realName}}</strong></a>
+                                      </div>`)[0];
+                
+                popup.setContent(secureContent);
+            }});
+            secureCluster.addLayer(marker);
+        }}
+        
+        // FIX 3: Add the cluster layer back to the main map!
+        myMap.addLayer(secureCluster);
+    }}
+    </script>
+    """
+
+    final_html = cleansed_html.replace("</body>", secure_js + "\n</body>")
+    return final_html

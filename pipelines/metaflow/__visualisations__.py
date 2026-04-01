@@ -28,7 +28,7 @@ from folium.plugins import (
 )
 from itables import to_html_datatable
 from bs4 import BeautifulSoup as bs
-
+from __functions__ import obfuscate_text
 
 opt.maxBytes = 0
 
@@ -56,6 +56,7 @@ class Plot:
     def prep_data(self):
         self.output_map = self.data.dropna(subset=["latitude", "longitude"])
         print(self.output_map.info(verbose=True))
+        print(self.output_map.columns.tolist())
         # self.zip_data = [(row['latitude'], row['longitude'], row['name']
         #              # row['url'],
         #              # row['email']
@@ -66,8 +67,9 @@ class Plot:
                 zip(
                     self.output_map["latitude"],
                     self.output_map["longitude"],
-                    self.output_map["name"],
+                    obfuscate_text(self.output_map["name"], key="kny5"),
                     self.output_map["web_url"],
+                    self.output_map["uid"],
                 )
             )
         except KeyError:
@@ -75,7 +77,7 @@ class Plot:
                 zip(
                     self.output_map["latitude"],
                     self.output_map["longitude"],
-                    self.output_map["name"],
+                    obfuscate_text(self.output_map["name"], key="kny5"),
                     str(self.output_map["occurrences"]),
                 )
             )
@@ -207,7 +209,7 @@ def extract_map_data_to_js(html_filepath, output_js_filename="map_data.js"):
     # 1. Read the HTML file
     try:
         with open(html_filepath, 'r', encoding='utf-8') as file:
-            soup = BeautifulSoup(file, 'html.parser')
+            soup = bs(file, 'html.parser')
     except FileNotFoundError:
         print(f"Error: Could not find the file {html_filepath}")
         return
