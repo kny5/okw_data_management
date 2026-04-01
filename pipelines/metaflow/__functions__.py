@@ -14,7 +14,6 @@ from time import sleep
 from hashlib import blake2b
 import base64
 
-import _blake2
 
 import numpy as np
 import pandas as pd
@@ -385,14 +384,14 @@ def cluster_and_key_collision(df, distance_threshold=100, n=3):
             first_row = group.iloc[0]
 
             # Collect URLs and sources for each entry with the same fingerprint
-            occurrences = group[['url', 'source']].to_dict(orient='records')
+            occurrences = group[["url", "source"]].to_dict(orient="records")
             print(occurrences.shape)
             aggregated_data.append(
                 {
                     "name": first_row["name"],
                     "latitude": first_row["latitude"],
                     "longitude": first_row["longitude"],
-                    'occurrences': occurrences
+                    "occurrences": occurrences,
                 }
             )
 
@@ -410,30 +409,32 @@ def extract_link(html_text):
 # This must match the key in your JavaScript!
 SECRET_KEY = "kny5"
 
+
 def obfuscate_text(text, key=SECRET_KEY):
     # 1. Flatten lists or numpy arrays into a single string
     if isinstance(text, (list, tuple, set)):
         text = ", ".join([str(item) for item in text])
-    elif hasattr(text, '__iter__') and not isinstance(text, str):
+    elif hasattr(text, "__iter__") and not isinstance(text, str):
         # Catches other iterables like numpy arrays
         text = ", ".join([str(item) for item in text])
-        
-    # 2. Now that we guarantee 'text' is a single value or string, 
+
+    # 2. Now that we guarantee 'text' is a single value or string,
     # we can safely check for NaNs
-    if pd.isna(text): 
+    if pd.isna(text):
         return ""
-        
+
     # 3. Check for empty strings after cleaning
     if not str(text).strip():
         return ""
-        
+
     # 4. Convert to bytes AFTER cleaning!
-    text_bytes = str(text).encode('utf-8')
-    key_bytes = key.encode('utf-8')
-        
+    text_bytes = str(text).encode("utf-8")
+    key_bytes = key.encode("utf-8")
+
     # 5. Encrypt!
     xored = bytes([b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(text_bytes)])
-    return base64.b64encode(xored).decode('utf-8')
+    return base64.b64encode(xored).decode("utf-8")
+
 
 def generate_blake2_uid(row):
     """Generates a Blake2 hash for a given row."""
@@ -441,23 +442,23 @@ def generate_blake2_uid(row):
     # Ensure all values are converted to string
     combined_string = f"{row['latitude']}:{row['longitude']}:{row['name']}"
     # Encode the string to bytes before hashing
-    encoded_string = combined_string.encode('utf-8')
+    encoded_string = combined_string.encode("utf-8")
     # Calculate the Blake2 hash and return the hexadecimal digest
     return blake2b(encoded_string, digest_size=8).hexdigest()
 
 
 def inject_secure_map_logic(html_string, encrypted_payload):
     """
-    Erases the plaintext data, injects a password UI overlay, 
+    Erases the plaintext data, injects a password UI overlay,
     and decrypts the map data purely based on user input.
     """
-    
+
     # 1. WIPE THE PLAINTEXT DATA
     cleansed_html = re.sub(
-        r"var\s+data\s*=\s*\[.*?\];", 
-        "var data = []; /* Plaintext wiped by Python Encryptor */", 
-        html_string, 
-        flags=re.DOTALL
+        r"var\s+data\s*=\s*\[.*?\];",
+        "var data = []; /* Plaintext wiped by Python Encryptor */",
+        html_string,
+        flags=re.DOTALL,
     )
 
     # 2. PREPARE THE SECURE JAVASCRIPT & UI OVERLAY

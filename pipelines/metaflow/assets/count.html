@@ -1,0 +1,84 @@
+<script>
+setTimeout(function() {
+    
+    // 1. Auto-discover the Folium map object on the page
+    var myMap;
+    for (var key in window) {
+        if (window[key] && window[key] instanceof L.Map) {
+            myMap = window[key];
+            break;
+        }
+    }
+
+    if (!myMap) {
+        console.error("Could not find Leaflet map object.");
+        return;
+    }
+
+    // 2. Create the visual counter box
+    var div = document.createElement('div');
+    div.id = 'dynamic-point-counter';
+    
+    // Styling the box 
+    div.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+    div.style.padding = '8px 15px';
+    div.style.borderRadius = '5px';
+    div.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+    div.style.fontFamily = "'Fira Mono', monospace, Arial";
+    div.style.fontWeight = 'bold';
+    div.style.fontSize = '14px';
+    div.style.color = '#333';
+    div.style.position = 'absolute'; 
+    div.style.bottom = '20px'; 
+    div.style.left = '50%'; 
+    div.style.transform = 'translateX(-50%)'; 
+    div.style.zIndex = '9999';
+    
+    div.innerHTML = 'Calculating...';
+    myMap.getContainer().appendChild(div);
+
+    // 3. NEW LOGIC: Ask Leaflet for the markers directly
+    function updateCounter() {
+        var clusterGroup = null;
+        
+        // Find the Marker Cluster layer on the map
+        myMap.eachLayer(function(layer) {
+            if (layer instanceof L.MarkerClusterGroup) {
+                clusterGroup = layer;
+            }
+        });
+
+        if (!clusterGroup) {
+            document.getElementById('dynamic-point-counter').innerHTML = 'Waiting for data...';
+            return;
+        }
+
+        var bounds = myMap.getBounds(); 
+        
+        // .getLayers() safely grabs every single marker, even if it's currently hidden inside a cluster!
+        var allMarkers = clusterGroup.getLayers(); 
+        var total = allMarkers.length;
+        var inView = 0;
+
+        for (var i = 0; i < total; i++) {
+            // Get the coordinates of the specific Leaflet marker
+            var markerLatLng = allMarkers[i].getLatLng();
+            
+            // Check if those coordinates are inside the current screen bounds
+            if (bounds.contains(markerLatLng)) {
+                inView++;
+            }
+        }
+
+        document.getElementById('dynamic-point-counter').innerHTML = inView + ' / ' + total + ' View/Total';
+    }
+
+    // 4. Trigger the math whenever the user finishes moving or zooming the map
+    myMap.on('moveend', updateCounter);
+    myMap.on('zoomend', updateCounter);
+
+    // Run it once immediately to show the initial count
+    updateCounter();
+
+}, 1500); // Increased delay slightly to 1.5s to ensure the heavy cluster group finishes rendering first
+</script>

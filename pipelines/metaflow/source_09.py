@@ -16,9 +16,7 @@ from metaflow import FlowSpec, Parameter, card, step
 
 
 class Source_09(FlowSpec):
-    url = Parameter(
-        "url", default="data/hackerspaces_list.json"
-    )
+    url = Parameter("url", default="data/hackerspaces_list.json")
 
     @step
     def start(self):
@@ -41,7 +39,7 @@ class Source_09(FlowSpec):
     @step
     def clean(self):
         self.html = Tabular(self.data).table_output()
-        
+
         self.data.rename(
             columns={
                 "lat": "latitude",
@@ -51,7 +49,7 @@ class Source_09(FlowSpec):
             },
             inplace=True,
         )
-        self.data['web_url'] = self.data['text'].apply(extract_link)
+        self.data["web_url"] = self.data["text"].apply(extract_link)
         self.output = self.data[["name", "latitude", "longitude", "web_url"]]
         self.next(self.transform)
 

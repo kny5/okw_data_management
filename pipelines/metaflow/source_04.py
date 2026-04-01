@@ -37,10 +37,7 @@ class Source_04(FlowSpec):
         filter_20 = pd.DataFrame(filter_10)
         filter_20["web_url"] = filter_20["description"].apply(extract_urls)
         self.data = pd.DataFrame()
-        self.data = filter_20.drop(
-            columns=["ns", "styleUrl"],
-            errors="ignore"
-        )
+        self.data = filter_20.drop(columns=["ns", "styleUrl"], errors="ignore")
         print(self.data.columns.tolist())
         self.html = Tabular(self.data).table_output()
         self.output = self.data[["name", "latitude", "longitude", "web_url"]]

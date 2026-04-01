@@ -11,13 +11,19 @@ Created on Mon Oct 28 06:17:15 2024
 # run merge join strategy on each workspace/tag
 
 import pandas as pd
-from __functions__ import ReverseGeocode, cluster_and_aggregate, obfuscate_text, inject_secure_map_logic, generate_blake2_uid
+from __functions__ import (
+    ReverseGeocode,
+    cluster_and_aggregate,
+    obfuscate_text,
+    inject_secure_map_logic,
+    generate_blake2_uid,
+)
 from __visualisations__ import Plot, Tabular
 from metaflow import Flow, FlowSpec, card, resources, step, NBRunner
 
 
 class JoinData01(FlowSpec):
-    
+
     # @catch(var='failure')
     @resources(memory=8000, cpu=11, gpu=1)
     @step
@@ -36,27 +42,29 @@ class JoinData01(FlowSpec):
             "Source_11",
             "Source_12",
         ]
-        
+
         self.next(self.get_or_generate_data, foreach="sources")
 
     @step
     def get_or_generate_data(self):
         source_name = self.input
         print(f"Processing source: {source_name}")
-        
+
         try:
             # First, try to get the existing data
             # (Note: make sure 'Flow' is imported properly in your actual file)
             self.data = Flow(source_name).latest_successful_run.data.output
             print(f"Successfully fetched existing data for {source_name}")
-            
+
         except Exception as e:
             # If it fails (e.g., flow hasn't run yet), catch the error and run the notebook
-            print(f"Data fetch failed for {source_name} with error: {e}. Running notebook...")
-            
+            print(
+                f"Data fetch failed for {source_name} with error: {e}. Running notebook..."
+            )
+
             # Assuming NBRunner is imported and runs synchronously
             NBRunner(Flow(source_name))
-            
+
             # Try fetching the data again after the notebook finishes
             self.data = Flow(source_name).latest_successful_run.data.output
             print(f"Successfully fetched newly generated data for {source_name}")
@@ -91,15 +99,19 @@ class JoinData01(FlowSpec):
 
     @step
     def protect(self):
-        self.output["name"] = self.output["name"].apply(lambda x: obfuscate_text(x, key="kny5"))
-        self.output["web_url"] = self.output["web_url"].apply(lambda x: obfuscate_text(x, key="kny5"))
+        self.output["name"] = self.output["name"].apply(
+            lambda x: obfuscate_text(x, key="kny5")
+        )
+        self.output["web_url"] = self.output["web_url"].apply(
+            lambda x: obfuscate_text(x, key="kny5")
+        )
         self.next(self.give_uid)
 
     @step
     def give_uid(self):
-        self.output['uid'] = self.output.apply(generate_blake2_uid, axis=1)
+        self.output["uid"] = self.output.apply(generate_blake2_uid, axis=1)
         self.next(self.geocoding)
-    
+
     @step
     def geocoding(self):
         self.geocode = ReverseGeocode(self.output).get()
@@ -107,21 +119,17 @@ class JoinData01(FlowSpec):
 
     @step
     def visualise(self):
-        self.next(self.data_table, self.data_map, self.data_stats, self.make_africa_eu, self.territories)
+        self.next(
+            self.data_table,
+            self.data_map,
+            self.data_stats,
+            self.make_africa_eu,
+            self.territories,
+        )
 
-    
     @step
     def territories(self):
-        self.countries = [
-            "MX",
-            "BR",
-            "SG",
-            "IN",
-            "NL",
-            "US",
-            "GB",
-            "DE"
-        ]
+        self.countries = ["MX", "BR", "SG", "IN", "NL", "US", "GB", "DE"]
         self.next(self.spaces_by_country, foreach="countries")
 
     @card(type="html")
@@ -131,12 +139,11 @@ class JoinData01(FlowSpec):
         self.country = self.geocode[self.geocode["cc2"] == current_country]
         self.html = Plot(self.country, max_cluster_rad=30).render()
         self.next(self.joint)
-    
 
     @card(type="html")
     @step
     def make_africa_eu(self):
-        
+
         # self.html = Tabular(self.geocode).table_output()
         self.makeafricaeu = self.geocode[
             self.geocode["continent"].isin(["Africa", "Europe"])
@@ -155,15 +162,17 @@ class JoinData01(FlowSpec):
     @step
     def data_map(self):
         # 2. Generate the giant encrypted string payload
-        json_string = self.output[['latitude', 'longitude', 'name', 'web_url']].to_json(orient='records')
+        json_string = self.output[["latitude", "longitude", "name", "web_url"]].to_json(
+            orient="records"
+        )
         final_payload = obfuscate_text(json_string, key="kny5")
 
         # 3. Generate the standard Folium map HTML
-        raw_html = Plot(self.output, max_cluster_rad=30).render()
+        self.html = Plot(self.output, max_cluster_rad=30).render()
 
         # 4. RUN OUR AUTOMATION SCRIPT
         # This scrubs the plaintext from raw_html and injects the Javascript
-        self.html = inject_secure_map_logic(raw_html, final_payload)
+        self.crypto_html = inject_secure_map_logic(self.html, final_payload)
 
         # 5. The card will now display the secure map
         self.next(self.wrap_up)
@@ -175,7 +184,7 @@ class JoinData01(FlowSpec):
         print("test")
         # self.html = Statistics(self.output).render()
         self.next(self.wrap_up)
-    
+
     @step
     def joint(self, inputs):
         self.output = inputs[0].output

@@ -38,8 +38,7 @@ class Source_03(FlowSpec):
         filter_30 = filter_20["description"].apply(parse_description).apply(pd.Series)
         self.data = pd.DataFrame()
         self.data = pd.concat([filter_20, filter_30], axis=1).drop(
-            columns=["description", "ns", "styleUrl"],
-            errors="ignore"
+            columns=["description", "ns", "styleUrl"], errors="ignore"
         )
         print(self.data.columns.tolist())
         self.html = Tabular(self.data).table_output()
