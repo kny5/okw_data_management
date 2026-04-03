@@ -16,6 +16,7 @@ class Source_10(FlowSpec):
     url = Parameter("url", default="https://makery.gogocarto.fr/api/elements.json")
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
+    render_map_ = Parameter("render_map", default=False)
 
     @step
     def start(self):
@@ -43,7 +44,7 @@ class Source_10(FlowSpec):
             filtered, radius=int(self.radius_), min_points=int(self.min_points_)
         )
         self.html = Tabular(self.duplicates).table_output()
-        self.data = filtered[["name", "latitude", "longitude", "web_url"]]
+        self.data = filtered[["name", "latitude", "longitude", "web_url", "makery_id"]]
         print(self.data.columns.tolist())
         self.output = self.data[~self.data.isin(self.duplicates).all(axis=1)]
 
@@ -69,7 +70,8 @@ class Source_10(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
+        if self.render_map_:
+            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
         self.next(self.wrapup)
 
     @step
@@ -79,9 +81,16 @@ class Source_10(FlowSpec):
         )
         self.next(self.wrapup)
 
+    @card(type="html")
     @step
     def wrapup(self, inputs):
         self.output = inputs[0].output
+        self.output["source"] = "10"
+        self.output["record_source_url"] = "https://makery.gogocarto.fr/map#/fiche/" + self.output.name.str.replace(" ", "-") + "/" + self.output.makery_id
+        print(self.output.shape)
+        print(self.output.columns.tolist())
+        print(self.output.tail(5))
+        self.html = Tabular(self.output).table_output()
         self.next(self.end)
 
     @step

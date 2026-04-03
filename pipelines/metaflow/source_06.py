@@ -27,7 +27,6 @@ class Source_06(FlowSpec):
 
     # URL of the Make.Works API with pagination placeholder
     url = "https://make.works/companies?page={n}&format=json"
-
     # Pipeline parameters with default values
     radius_ = Parameter(
         "radius", default=1, help="Radius value for proximity filtering"
@@ -35,6 +34,8 @@ class Source_06(FlowSpec):
     min_points_ = Parameter(
         "min_points", default=3, help="Minimum number of points for proximity filtering"
     )
+
+    render_map_ = Parameter("render_map", default=False)
 
     @step
     def start(self):
@@ -76,6 +77,7 @@ class Source_06(FlowSpec):
         )
         print(self.data.columns.tolist())
         # Select relevant columns for further processing
+        self.data["record_source_url"] = self.data["record_source_url"].str[:-5]
         self.output = self.data[
             ["name", "latitude", "longitude", "record_source_url", "web_url"]
         ]
@@ -116,7 +118,8 @@ class Source_06(FlowSpec):
         """
         # Drop rows with missing latitude/longitude and create a map
         # visualization
-        self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
+        if self.render_map_:
+            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
         self.next(self.join)
 
     @step
@@ -128,8 +131,15 @@ class Source_06(FlowSpec):
         self.output = inputs[
             0
         ].output  # Use the output from the first input (data_table)
+        self.next(self.wrapup)
+    
+    @step
+    def wrapup(self):
+        self.output["source"] = "06"
+        print(self.output.shape)
+        print(self.output.columns.tolist())
         self.next(self.end)
-
+    
     @step
     def end(self):
         """

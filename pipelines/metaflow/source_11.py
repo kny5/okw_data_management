@@ -18,6 +18,7 @@ class Source_11(FlowSpec):
     )
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
+    render_map_ = Parameter("render_map", default=False)
 
     @step
     def start(self):
@@ -37,15 +38,15 @@ class Source_11(FlowSpec):
     def clean(self):
         self.raw["latitude"] = pd.to_numeric(self.raw["lat"], errors="coerce")
         self.raw["longitude"] = pd.to_numeric(self.raw["long"], errors="coerce")
-        self.raw.rename(columns={"link": "web_url"}, inplace=True)
-        self.output = self.raw[["name", "latitude", "longitude", "web_url"]]
+        self.raw.rename(columns={"website": "web_url"}, inplace=True)
+        self.raw["record_source_url"] = "https://makerspace.com" + self.raw["link"]
+        self.output = self.raw[["name", "latitude", "longitude", "web_url", "record_source_url"]]
         self.html_2 = Tabular(self.output).table_output()
         self.next(self.transform)
 
     @card(type="html")
     @step
     def transform(self):
-        # self.output['record_source_url'] = self.output.link.apply(lambda x: 'https://makerspace.com' + x)
         self.geocode = ReverseGeocode(self.output).get()
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
@@ -63,7 +64,8 @@ class Source_11(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
+        if self.render_map_:
+            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
         self.next(self.wrapup)
 
     @step
@@ -76,6 +78,10 @@ class Source_11(FlowSpec):
     @step
     def wrapup(self, inputs):
         self.output = inputs[0].output
+        # self.output['record_source_url'] = self.output.link.apply(lambda x: 'https://makerspace.com' + x)
+        self.output["source"] = "11"
+        print(self.output.shape)
+        print(self.output.columns.tolist())
         self.next(self.end)
 
     @step

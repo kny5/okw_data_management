@@ -19,13 +19,19 @@ from __functions__ import (
     generate_blake2_uid,
 )
 from __visualisations__ import Plot, Tabular
-from metaflow import Flow, FlowSpec, card, resources, step, NBRunner
+from metaflow import Flow, FlowSpec, card, resources, step, Parameter, Runner
+
+LOAD_HTML = None
 
 
 class JoinData01(FlowSpec):
+    encrypt_key = Parameter("encrypt_key", default="kny5")
+    recreate = Parameter("recreate", default=False)
+    render_map = Parameter("render_map", default=True)
+    cypher = Parameter("cypher", default=False)
 
     # @catch(var='failure')
-    @resources(memory=8000, cpu=11, gpu=1)
+    @resources(memory=20000, cpu=18, gpu=1)
     @step
     def start(self):
         # Define the sources from which to fetch data
@@ -47,29 +53,35 @@ class JoinData01(FlowSpec):
 
     @step
     def get_or_generate_data(self):
+        print("->"*50)
+        print(self.input)
+        print("->"*50)
         source_name = self.input
         print(f"Processing source: {source_name}")
 
         try:
-            # First, try to get the existing data
-            # (Note: make sure 'Flow' is imported properly in your actual file)
+            # Force recreation if requested
+            if self.recreate:
+                raise Exception("Recreation requested")
+            
+            # Try to fetch existing data
             self.data = Flow(source_name).latest_successful_run.data.output
-            print(f"Successfully fetched existing data for {source_name}")
+            print(f"✅ Fetched existing data for {source_name}")
 
-        except Exception as e:
-            # If it fails (e.g., flow hasn't run yet), catch the error and run the notebook
-            print(
-                f"Data fetch failed for {source_name} with error: {e}. Running notebook..."
-            )
-
-            # Assuming NBRunner is imported and runs synchronously
-            NBRunner(Flow(source_name))
-
-            # Try fetching the data again after the notebook finishes
-            self.data = Flow(source_name).latest_successful_run.data.output
-            print(f"Successfully fetched newly generated data for {source_name}")
-
-        # Move to the join step
+        except Exception:
+            # Run the flow using the terminal-friendly Runner
+            path = f"pipelines/metaflow/{source_name.lower()}.py"
+            print(f"🔄 Running {path} via Runner...")
+            
+            with Runner(path).run() as running:
+                if running.status == 'successful':
+                    print(f"✅ {running.run} finished successfully.")
+                    # Assign to self.data instead of returning!
+                    self.data = running.run.data.output
+                else:
+                    raise Exception(f"❌ {running.run} failed with status: {running.status}")
+        
+        # Metaflow is now guaranteed to reach this transition
         self.next(self.concatenate)
 
     @step
@@ -95,26 +107,14 @@ class JoinData01(FlowSpec):
         # self.output = cluster_and_key_collision(filter_0, distance_threshold=6000, n=2)
         # self.output = filter_0[~filter_0.isin(filter_1).all(axis=1)]
         self.output = filter_1
-        self.next(self.protect)
-
-    @step
-    def protect(self):
-        self.output["name"] = self.output["name"].apply(
-            lambda x: obfuscate_text(x, key="kny5")
-        )
-        self.output["web_url"] = self.output["web_url"].apply(
-            lambda x: obfuscate_text(x, key="kny5")
-        )
+        print(self.output.shape)
+        print(self.output.columns.tolist())
+        print(self.output.tail(5))
         self.next(self.give_uid)
 
     @step
     def give_uid(self):
         self.output["uid"] = self.output.apply(generate_blake2_uid, axis=1)
-        self.next(self.geocoding)
-
-    @step
-    def geocoding(self):
-        self.geocode = ReverseGeocode(self.output).get()
         self.next(self.visualise)
 
     @step
@@ -123,13 +123,13 @@ class JoinData01(FlowSpec):
             self.data_table,
             self.data_map,
             self.data_stats,
-            self.make_africa_eu,
             self.territories,
         )
 
     @step
     def territories(self):
         self.countries = ["MX", "BR", "SG", "IN", "NL", "US", "GB", "DE"]
+        self.geocode = ReverseGeocode(self.output).get()
         self.next(self.spaces_by_country, foreach="countries")
 
     @card(type="html")
@@ -137,19 +137,8 @@ class JoinData01(FlowSpec):
     def spaces_by_country(self):
         current_country = self.input
         self.country = self.geocode[self.geocode["cc2"] == current_country]
-        self.html = Plot(self.country, max_cluster_rad=30).render()
+        self.html = Plot(self.country, max_cluster_rad=60).render()
         self.next(self.joint)
-
-    @card(type="html")
-    @step
-    def make_africa_eu(self):
-
-        # self.html = Tabular(self.geocode).table_output()
-        self.makeafricaeu = self.geocode[
-            self.geocode["continent"].isin(["Africa", "Europe"])
-        ]
-        self.html = Plot(self.makeafricaeu, max_cluster_rad=30).render()
-        self.next(self.wrap_up)
 
     @card(type="html")
     @step
@@ -161,33 +150,48 @@ class JoinData01(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        # 2. Generate the giant encrypted string payload
-        json_string = self.output[["latitude", "longitude", "name", "web_url"]].to_json(
-            orient="records"
-        )
-        final_payload = obfuscate_text(json_string, key="kny5")
-
-        # 3. Generate the standard Folium map HTML
-        self.html = Plot(self.output, max_cluster_rad=30).render()
-
-        # 4. RUN OUR AUTOMATION SCRIPT
-        # This scrubs the plaintext from raw_html and injects the Javascript
-        self.crypto_html = inject_secure_map_logic(self.html, final_payload)
-
-        # 5. The card will now display the secure map
+        if self.render_map:
+            global LOAD_HTML
+            LOAD_HTML = Plot(self.output, max_cluster_rad=60).render()
+            self.html = LOAD_HTML
         self.next(self.wrap_up)
 
     @card(type="html")
     @step
     def data_stats(self):
         # Generate map visualization
-        print("test")
+        print("Stats missing WIP")
+        most_common_words = self.output['name'].str.split().explode().value_counts().head(20)
         # self.html = Statistics(self.output).render()
+        print(most_common_words)
         self.next(self.wrap_up)
 
     @step
     def joint(self, inputs):
         self.output = inputs[0].output
+        self.next(self.encryption_map)
+
+    @card(type="html")
+    @step
+    def encryption_map(self):
+        if self.cypher and self.render_map:
+            self.output["name"] = self.output["name"].apply(
+                lambda x: obfuscate_text(x, key=self.encrypt_key)
+            )
+
+            self.output["web_url"] = self.output["web_url"].apply(
+                lambda x: obfuscate_text(x, key=self.encrypt_key)
+            )
+
+            json_string = self.output[["latitude", "longitude", "name", "web_url"]].to_json(
+                orient="records"
+            )
+
+            final_payload = obfuscate_text(json_string, key=self.encrypt_key)
+
+            if LOAD_HTML:
+                self.html = inject_secure_map_logic(LOAD_HTML, final_payload)
+
         self.next(self.wrap_up)
 
     @step
@@ -202,7 +206,9 @@ class JoinData01(FlowSpec):
     @step
     def end(self):
         print(self.output)  # Now `self.output` will be available here
-
+        print(self.output.shape)
+        print(self.output.columns.tolist())
+        print(self.output.tail(5))
 
 if __name__ == "__main__":
     JoinData01()

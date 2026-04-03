@@ -17,6 +17,7 @@ class Source_02(FlowSpec):
     url = "https://api.fablabs.io/0/labs.json"
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
+    render_map_ = Parameter("render_map", default=False)
 
     @step
     def start(self):
@@ -57,11 +58,8 @@ class Source_02(FlowSpec):
         ]
         self.geocode = ReverseGeocode(self.output).get()
         self.html = Tabular(self.geocode).table_output()
+        
         self.next(self.visualise)
-
-    # @step
-    # def load(self):
-    #     self.next(self.data_table, self.data_map)
 
     @step
     def visualise(self):
@@ -76,7 +74,8 @@ class Source_02(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        self.html = Plot(self.output).render()
+        if self.render_map_:
+            self.html = Plot(self.output).render()
         self.next(self.wrapup)
 
     @step
@@ -89,6 +88,9 @@ class Source_02(FlowSpec):
     @step
     def wrapup(self, inputs):
         self.output = inputs[0].output
+        self.output["source"] = "02"
+        print(self.output.shape)
+        print(self.output.columns.tolist()) 
         self.next(self.end)
 
     @step

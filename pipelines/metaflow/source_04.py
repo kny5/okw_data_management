@@ -9,13 +9,14 @@ Created on Thu Oct 31 07:51:41 2024
 import pandas as pd
 from __functions__ import ReverseGeocode
 from __visualisations__ import Plot, Tabular
-from metaflow import FlowSpec, card, step
+from metaflow import FlowSpec, card, step, Parameter
 from okw_libs.dwld import req_data
 from okw_libs.g_maps import extract_kml_data, extract_urls, kml_object_to_dict
 
 
 class Source_04(FlowSpec):
     url = "https://www.google.com/maps/d/u/0/viewer?mid=1wKXDd1rOs4ls1EiZswQr-upFq7o&ll=38.418307201373004%2C-100.67343475982062&z=5"
+    render_map_ = Parameter("render_map", default=False)
 
     @step
     def start(self):
@@ -50,10 +51,6 @@ class Source_04(FlowSpec):
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
 
-    # @step
-    # def load(self):
-    #     self.next(self.data_table, self.data_map)
-
     @step
     def visualise(self):
         self.next(self.data_table, self.data_map, self.data_stats)
@@ -67,7 +64,8 @@ class Source_04(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
+        if self.render_map_:
+            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
         self.next(self.wrapup)
 
     @step
@@ -80,6 +78,10 @@ class Source_04(FlowSpec):
     @step
     def wrapup(self, inputs):
         self.output = inputs[0].output
+        self.output["source"] = "04"
+        self.output["record_source_url"] = None
+        print(self.output.shape)
+        print(self.output.columns.tolist())
         self.next(self.end)
 
     @step

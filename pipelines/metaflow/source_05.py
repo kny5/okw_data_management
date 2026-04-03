@@ -12,7 +12,7 @@ import pandas as pd
 from __functions__ import ReverseGeocode
 from __visualisations__ import Plot, Tabular
 from bs4 import BeautifulSoup
-from metaflow import FlowSpec, card, step
+from metaflow import FlowSpec, card, step, Parameter
 from okw_libs.dwld import req_data
 
 
@@ -29,6 +29,7 @@ def html_collector(html_content):
 
 class Source_05(FlowSpec):
     url = "https://www.makertour.fr/map"
+    render_map_ = Parameter("render_map", default=False)
 
     @step
     def start(self):
@@ -86,7 +87,8 @@ class Source_05(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
+        if self.render_map_:
+            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
         self.next(self.wrapup)
 
     @step
@@ -99,6 +101,9 @@ class Source_05(FlowSpec):
     @step
     def wrapup(self, inputs):
         self.output = inputs[0].output
+        self.output["source"] = "05"
+        print(self.output.shape)
+        print(self.output.columns.tolist())
         self.next(self.end)
 
     @step

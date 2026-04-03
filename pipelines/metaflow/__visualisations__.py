@@ -29,7 +29,7 @@ from folium.plugins import (
 )
 from itables import to_html_datatable
 from bs4 import BeautifulSoup as bs
-from __functions__ import obfuscate_text
+from __functions__ import img_uri
 
 opt.maxBytes = 0
 
@@ -55,45 +55,52 @@ class Plot:
         self.add_count()
 
     def prep_data(self):
+
         self.output_map = self.data.dropna(subset=["latitude", "longitude"])
+        
         print(self.output_map.info(verbose=True))
         print(self.output_map.columns.tolist())
-        # self.zip_data = [(row['latitude'], row['longitude'], row['name']
-        #              # row['url'],
-        #              # row['email']
-        #              )
-        #             for index, row in self.output_map.iterrows()]
+
+        sources = self.output_map["source"] if "source" in self.output_map.columns else [None] * len(self.output_map)
+        uids = self.output_map["uid"] if "uid" in self.output_map.columns else [None] * len(self.output_map)
+        record_urls = self.output_map["record_source_url"] if "record_source_url" in self.output_map.columns else [None] * len(self.output_map)
+        
+        self.output_map = self.data.dropna(subset=["latitude", "longitude"])
+
         try:
             self.zip_data = list(
                 zip(
                     self.output_map["latitude"],
                     self.output_map["longitude"],
-                    obfuscate_text(self.output_map["name"], key="kny5"),
+                    self.output_map["name"],
+                    sources,
                     self.output_map["web_url"],
-                    self.output_map["uid"],
+                    uids,
+                    record_urls,
                 )
             )
-        except KeyError:
-            self.zip_data = list(
-                zip(
-                    self.output_map["latitude"],
-                    self.output_map["longitude"],
-                    obfuscate_text(self.output_map["name"], key="kny5"),
-                    str(self.output_map["occurrences"]),
-                )
-            )
-        self.bounds = [
+            print(len(self.zip_data))
+            print(self.zip_data[-5:])
+        
+            self.bounds = [
             [self.output_map["latitude"].min(), self.output_map["longitude"].min()],
             [self.output_map["latitude"].max(), self.output_map["longitude"].max()],
         ]
+        
+        except Exception as e:
+            # FIX: Print the actual missing key
+            print(f"CRITICAL ERROR: {e}") 
+            return False
+        
 
     def set_map(self):
         # Check for NaN values in latitude and longitude before creating the
         # map
-        if (
-            not np.isnan(self.output_map["latitude"]).any()
-            and not np.isnan(self.output_map["longitude"]).any()
-        ):
+        #if (
+            # not np.isnan(self.output_map["latitude"]).any()
+            # and not np.isnan(self.output_map["longitude"]).any()
+        #):
+        try:
             self.m = folium.Map(
                 location=[
                     self.output_map["latitude"].mean(),
@@ -103,13 +110,14 @@ class Plot:
                 tiles=self.tiles_url,
                 attr=self.tiles_attribution,
                 max_zoom=15,
-                # worldCopyJump= False,
+                world_copy_jump= False,
+                worldCopyJump = False,
                 zoomControl=False,
                 prefer_canvas=True,
             )
             self.m.fit_bounds(self.bounds)
-        else:
-            print("Location values cannot contain NaNs.")
+        except Exception as e:
+            print(e)
 
     def add_points(self):
         FastMarkerCluster(
@@ -130,8 +138,9 @@ class Plot:
         self.m.get_root().html.add_child(folium.Element(count_html))
 
     def render(self):
+        
         FloatImage(
-            "https://github.com/iop-alliance/data_reports/blob/main/assets/img/iopa_logo_okw_sm.png?raw=true",
+            img_uri("pipelines/metaflow/assets/dm_odk.gif"),
             bottom=3,
             left=3,
         ).add_to(self.m)
@@ -208,7 +217,6 @@ def extract_map_data_to_js(html_filepath, output_js_filename="map_data.js"):
     """
     print(f"Processing: {html_filepath}...")
 
-    # 1. Read the HTML file
     try:
         with open(html_filepath, "r", encoding="utf-8") as file:
             soup = bs(file, "html.parser")
@@ -216,7 +224,6 @@ def extract_map_data_to_js(html_filepath, output_js_filename="map_data.js"):
         print(f"Error: Could not find the file {html_filepath}")
         return
 
-    # 2. Find the target <script> tag containing 'var data ='
     target_script = None
     for script in soup.find_all("script"):
         # We check if the script has text inside and contains our specific variable
@@ -228,10 +235,8 @@ def extract_map_data_to_js(html_filepath, output_js_filename="map_data.js"):
         print("Could not find a script block containing 'var data ='. No changes made.")
         return
 
-    # 3. Extract the JavaScript content
     js_content = target_script.string.strip()
 
-    # 4. Save the JS content to the external file
     directory = os.path.dirname(html_filepath)
     js_filepath = os.path.join(directory, output_js_filename)
 
@@ -240,11 +245,9 @@ def extract_map_data_to_js(html_filepath, output_js_filename="map_data.js"):
 
     print(f"Successfully saved data to: {js_filepath}")
 
-    # 5. Modify the HTML to point to the new external JS file
     target_script.string = ""  # Clear the massive inline data
     target_script["src"] = output_js_filename  # Link to the new file
 
-    # 6. Save the modified HTML back to the original file
     with open(html_filepath, "w", encoding="utf-8") as file:
         file.write(str(soup))
 

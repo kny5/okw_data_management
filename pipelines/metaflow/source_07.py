@@ -23,6 +23,7 @@ class Source_07(FlowSpec):
     )
     radius_ = Parameter("radius", default=5)
     min_points_ = Parameter("min_points", default=4)
+    render_map_ = Parameter("render_map", default=False)
 
     @step
     def start(self):
@@ -44,15 +45,12 @@ class Source_07(FlowSpec):
 
     @step
     def clean(self):
-        self.data["record_source_url"] = self.data.url.apply(
-            lambda x: "https://offene-werkstaetten.org/werkstatt/" + x
-        )
         self.data.rename(
             columns={"lat": "latitude", "lng": "longitude", "web": "web_url"},
             inplace=True,
         )
         self.output = self.data[
-            ["name", "latitude", "longitude", "record_source_url", "web_url"]
+            ["name", "latitude", "longitude", "web_url"]
         ]
         self.next(self.transform)
 
@@ -76,7 +74,8 @@ class Source_07(FlowSpec):
     @card(type="html")
     @step
     def data_map(self):
-        self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
+        if self.render_map_:
+            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
         self.next(self.wrapup)
 
     @step
@@ -89,6 +88,12 @@ class Source_07(FlowSpec):
     @step
     def wrapup(self, inputs):
         self.output = inputs[0].output
+        self.output["source"] = "07"
+        self.output["record_source_url"] = self.output.web_url.apply(
+            lambda x: "https://offene-werkstaetten.org/werkstatt/" + x
+        )
+        print(self.output.shape)
+        print(self.output.columns.tolist())
         self.next(self.end)
 
     @step

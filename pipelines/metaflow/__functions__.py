@@ -338,6 +338,8 @@ def cluster_and_aggregate(df, distance_threshold=100, similarity_threshold=0.8):
                         "latitude": row["latitude"],
                         "longitude": row["longitude"],
                         "web_url": row["web_url"],
+                        "source": row["source"],
+                        "record_source_url": row["record_source_url"]
                     }
                 )
 
@@ -582,3 +584,9 @@ def inject_secure_map_logic(html_string, encrypted_payload):
 
     final_html = cleansed_html.replace("</body>", secure_js + "\n</body>")
     return final_html
+
+def img_uri(img):
+    image_file = img
+    with open(image_file, 'rb') as f:
+        encoded = base64.b64encode(f.read()).decode('UTF-8')
+    return f'data:image/png;base64,{encoded}'
