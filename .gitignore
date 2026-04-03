@@ -165,3 +165,14 @@ cython_debug/
 .idea/
 .virtual_documents/
 
+
+#metaflow
+.metaflow/
+.metaflow_spin/
+.ruff_cache
+metaflow_card_cache/
+
+#binary data
+*.sqlite
+
+
