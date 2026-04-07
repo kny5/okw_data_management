@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Oct 31 07:51:41 2024
 
@@ -7,12 +5,18 @@ Created on Thu Oct 31 07:51:41 2024
 """
 
 import pandas as pd
-from __functions__ import ReverseGeocode, filter_points_by_proximity, req_data
-from __visualisations__ import Plot, Tabular
-from metaflow import FlowSpec, Parameter, card, step
+from __functions__ import (
+    ReverseGeocode,
+    filter_points_by_proximity,
+    req_data,
+    generate_blake2_uid,
+)
+from __visualisations__ import Tabular
+from metaflow import FlowSpec, Parameter, card, step, current
+from __metasteps__ import TailSteps
 
 
-class Source_10(FlowSpec):
+class Source_10(FlowSpec, TailSteps):
     url = Parameter("url", default="https://makery.gogocarto.fr/api/elements.json")
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
@@ -44,58 +48,29 @@ class Source_10(FlowSpec):
             filtered, radius=int(self.radius_), min_points=int(self.min_points_)
         )
         self.html = Tabular(self.duplicates).table_output()
-        self.data = filtered[["name", "latitude", "longitude", "web_url", "makery_id"]]
-        print(self.data.columns.tolist())
-        self.output = self.data[~self.data.isin(self.duplicates).all(axis=1)]
+        self.data_input = filtered[["name", "latitude", "longitude", "web_url", "makery_id"]]
+        print(self.data_input.columns.tolist())
+        self.data_output = self.data_input[~self.data_input.isin(self.duplicates).all(axis=1)]
 
         self.next(self.transform)
 
     @card(type="html")
     @step
     def transform(self):
-        self.geocode = ReverseGeocode(self.output).get()
+        id = current.flow_name[-2:]
+        self.data_output["source"] = id
+        self.data_output["record_source_url"] = (
+            "https://makery.gogocarto.fr/map#/fiche/"
+            + self.data_output.name.str.replace(" ", "-")
+            + "/"
+            + self.data_output.makery_id
+        )
+        self.data_output["uid"] = self.data_output.apply(generate_blake2_uid, axis=1)
+        self.geocode = ReverseGeocode(self.data_output).get()
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
 
-    @step
-    def visualise(self):
-        self.next(self.data_table, self.data_map, self.data_stats)
 
-    @card(type="html")
-    @step
-    def data_table(self):
-        self.html = Tabular(self.output).table_output()
-        self.next(self.wrapup)
-
-    @card(type="html")
-    @step
-    def data_map(self):
-        if self.render_map_:
-            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
-        self.next(self.wrapup)
-
-    @step
-    def data_stats(self):
-        self.count = "OKW entries: {r[0]}, columns: {r[1]}, info: {c}".format(
-            r=self.output.shape, c=self.output.columns.tolist()
-        )
-        self.next(self.wrapup)
-
-    @card(type="html")
-    @step
-    def wrapup(self, inputs):
-        self.output = inputs[0].output
-        self.output["source"] = "10"
-        self.output["record_source_url"] = "https://makery.gogocarto.fr/map#/fiche/" + self.output.name.str.replace(" ", "-") + "/" + self.output.makery_id
-        print(self.output.shape)
-        print(self.output.columns.tolist())
-        print(self.output.tail(5))
-        self.html = Tabular(self.output).table_output()
-        self.next(self.end)
-
-    @step
-    def end(self):
-        print("Success")
 
 
 if __name__ == "__main__":

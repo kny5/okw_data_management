@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Oct 31 07:51:41 2024
 
@@ -13,7 +11,7 @@ import unicodedata
 from time import sleep
 from hashlib import blake2b
 import base64
-
+import time
 
 import numpy as np
 import pandas as pd
@@ -21,7 +19,26 @@ import requests
 from fuzzywuzzy import fuzz
 from scipy.spatial import KDTree
 from sklearn.cluster import DBSCAN
+import spacy
+from spacy.util import is_package
 
+
+import matplotlib.colors as mcolors
+import math
+
+_original_to_rgba = mcolors.to_rgba
+
+def _safe_to_rgba(c, alpha=None):
+    try:
+        # If upsetplot passes 'NaN', convert it to a transparent RGBA tuple
+        if isinstance(c, float) and math.isnan(c):
+            return (0.0, 0.0, 0.0, 0.0) 
+    except Exception:
+        pass
+    return _original_to_rgba(c, alpha)
+
+# Override the strict parser with our safe one
+mcolors.to_rgba = _safe_to_rgba
 
 def retry_on_exception(max_retries=3, backoff_factor=1):
     """
@@ -115,47 +132,37 @@ def marsh_json(dataframe):
 
 
 def filter_points_by_proximity(df, radius=100, min_points=2):
-    # Drop rows with missing values in 'latitude' or 'longitude'
+
     df = df.dropna(subset=["latitude", "longitude"])
 
-    # Convert radius from meters to degrees
-    # Approximation for latitude/longitude degrees
     radius_in_degrees = radius / 111_139
 
-    # Step 1: Extract latitude and longitude as a 2D numpy array
     coordinates = df[["latitude", "longitude"]].to_numpy()
 
-    # Step 2: Cluster points with DBSCAN to find nearby groups
     clustering = DBSCAN(eps=radius_in_degrees, min_samples=1).fit(coordinates)
     labels = clustering.labels_
 
-    # Step 3: Filter points based on proximity count within each cluster
     filtered_points = []
     unique_points = set()  # Keep track of unique points to remove duplicates
 
     for label in np.unique(labels):
-        # Select points and subset of DataFrame in this cluster
+
         cluster_points = coordinates[labels == label]
         cluster_df = df[labels == label]
 
-        # Use KDTree for efficient neighbor lookup within the cluster
         tree = KDTree(cluster_points)
         for i, point in enumerate(cluster_points):
-            # Get neighbors within the 10-meter radius
+
             neighbors = tree.query_ball_point(point, radius_in_degrees)
 
-            # Filter if it has enough nearby points
             if len(neighbors) >= min_points:
-                # Convert the point to a tuple (latitude, longitude) for
-                # hashing
+
                 point_tuple = tuple(cluster_df.iloc[i][["latitude", "longitude"]])
 
-                # Check for duplicates; keep only the latest
                 if point_tuple not in unique_points:
                     unique_points.add(point_tuple)
                     filtered_points.append(cluster_df.iloc[i])
 
-    # Return the filtered, non-duplicate points as a DataFrame
     return pd.DataFrame(filtered_points)
 
 
@@ -206,7 +213,7 @@ class ReverseGeocode:
         self.geocodes = read_cities[
             ["name", "country code", "latitude", "longitude", "timezone"]
         ].rename(columns={"country code": "cc2"})
-        # Initialize KDTree once for fast lookups
+
         self.tree = KDTree(self.geocodes[["latitude", "longitude"]])
 
     def nearest_neighbor(self, latitude, longitude):
@@ -246,25 +253,19 @@ def ngram_fingerprint(text, n=3):
     Returns:
         str: The n-gram fingerprint.
     """
-    # Step 1: Change all characters to lowercase
+
     text = text.lower()
 
-    # Step 2: Remove all punctuation, whitespace, and control characters
     text = re.sub(r"[^\w]", "", text)
 
-    # Step 3: Normalize extended Western characters to their ASCII
-    # representation
     text = "".join(
         c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn"
     )
 
-    # Step 4: Obtain all n-grams
     ngrams = [text[i : i + n] for i in range(len(text) - n + 1)]
 
-    # Step 5: Sort the n-grams and remove duplicates
     unique_ngrams = sorted(set(ngrams))
 
-    # Step 6: Join the sorted n-grams back together
     fingerprint = "".join(unique_ngrams)
 
     return fingerprint
@@ -272,15 +273,15 @@ def ngram_fingerprint(text, n=3):
 
 def normalize_name(name):
     """Normalize names by removing punctuation, extra spaces, accents, and sorting words."""
-    # Convert to lowercase
+
     name = name.lower()
-    # Remove punctuation and extra spaces
+
     name = re.sub(r"[^\w\s]", "", name)
-    # Remove accents
+
     name = "".join(
         c for c in unicodedata.normalize("NFD", name) if unicodedata.category(c) != "Mn"
     )
-    # Sort words to handle reordering
+
     name = " ".join(sorted(name.split()))
     return name
 
@@ -298,17 +299,15 @@ def cluster_and_aggregate(df, distance_threshold=100, similarity_threshold=0.8):
         pd.DataFrame: DataFrame with columns 'name', 'lat', 'long', and 'occurrences', where occurrences
                       is a list of dictionaries containing 'url' and 'source' for each similar occurrence.
     """
-    # Step 1: Normalize names in the DataFrame
+
     df["normalized_name"] = df["name"].apply(ngram_fingerprint)
 
-    # Step 2: Cluster based on geographical coordinates using DBSCAN
     coordinates = df[["latitude", "longitude"]].to_numpy()
     db = DBSCAN(
         eps=distance_threshold / 6371000, min_samples=1, metric="haversine"
     ).fit(coordinates)
     df["cluster"] = db.labels_
 
-    # Step 3: Group by cluster and process each cluster
     aggregated_data = []
     processed_names = set()  # Track processed names
 
@@ -318,9 +317,8 @@ def cluster_and_aggregate(df, distance_threshold=100, similarity_threshold=0.8):
         for idx, row in cluster_df.iterrows():
             norm_name = row["normalized_name"]
 
-            # Only process if the normalized name is not in processed_names
             if norm_name not in processed_names:
-                # Filter for similar normalized names within the cluster
+
                 similar_rows = cluster_df[
                     cluster_df["normalized_name"].apply(
                         lambda n: (
@@ -330,8 +328,6 @@ def cluster_and_aggregate(df, distance_threshold=100, similarity_threshold=0.8):
                     )
                 ]
 
-                # Collect URLs and sources for each similar name
-
                 aggregated_data.append(
                     {
                         "name": row["name"],
@@ -339,14 +335,12 @@ def cluster_and_aggregate(df, distance_threshold=100, similarity_threshold=0.8):
                         "longitude": row["longitude"],
                         "web_url": row["web_url"],
                         "source": row["source"],
-                        "record_source_url": row["record_source_url"]
+                        "record_source_url": row["record_source_url"],
                     }
                 )
 
-                # Add processed names to avoid duplications
                 processed_names.update(similar_rows["normalized_name"])
 
-    # Convert to DataFrame for output
     aggregated_df = pd.DataFrame(aggregated_data)
     return aggregated_df
 
@@ -364,17 +358,15 @@ def cluster_and_key_collision(df, distance_threshold=100, n=3):
         pd.DataFrame: DataFrame with columns 'name', 'lat', 'long', and 'occurrences', where occurrences
                       is a list of dictionaries containing 'url' and 'source' for each similar occurrence.
     """
-    # Step 1: Apply n-gram fingerprinting to the 'name' column
+
     df["name_fingerprint"] = df["name"].apply(lambda x: ngram_fingerprint(x, n))
 
-    # Step 2: Cluster based on geographical coordinates using DBSCAN
     coordinates = df[["latitude", "longitude"]].to_numpy()
     db = DBSCAN(
         eps=distance_threshold / 6371000, min_samples=1, metric="haversine"
     ).fit(coordinates)
     df["cluster"] = db.labels_
 
-    # Step 3: Group by cluster and process each cluster
     aggregated_data = []
 
     for cluster_id, cluster_df in df.groupby("cluster"):
@@ -382,10 +374,9 @@ def cluster_and_key_collision(df, distance_threshold=100, n=3):
         fingerprint_groups = cluster_df.groupby("name_fingerprint")
 
         for fingerprint, group in fingerprint_groups:
-            # Get the first occurrence for latitude and longitude
+
             first_row = group.iloc[0]
 
-            # Collect URLs and sources for each entry with the same fingerprint
             occurrences = group[["url", "source"]].to_dict(orient="records")
             print(occurrences.shape)
             aggregated_data.append(
@@ -397,55 +388,47 @@ def cluster_and_key_collision(df, distance_threshold=100, n=3):
                 }
             )
 
-    # Convert to DataFrame for output
     aggregated_df = pd.DataFrame(aggregated_data)
     return aggregated_df
 
 
 def extract_link(html_text):
-    # Search for an external https link
+
     match = re.search(r'href="(https?://[^"]+)"', html_text)
     return match.group(1) if match else None
 
 
-# This must match the key in your JavaScript!
 SECRET_KEY = "kny5"
 
 
 def obfuscate_text(text, key=SECRET_KEY):
-    # 1. Flatten lists or numpy arrays into a single string
+
     if isinstance(text, (list, tuple, set)):
         text = ", ".join([str(item) for item in text])
     elif hasattr(text, "__iter__") and not isinstance(text, str):
-        # Catches other iterables like numpy arrays
+
         text = ", ".join([str(item) for item in text])
 
-    # 2. Now that we guarantee 'text' is a single value or string,
-    # we can safely check for NaNs
     if pd.isna(text):
         return ""
 
-    # 3. Check for empty strings after cleaning
     if not str(text).strip():
         return ""
 
-    # 4. Convert to bytes AFTER cleaning!
     text_bytes = str(text).encode("utf-8")
     key_bytes = key.encode("utf-8")
 
-    # 5. Encrypt!
     xored = bytes([b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(text_bytes)])
     return base64.b64encode(xored).decode("utf-8")
 
 
 def generate_blake2_uid(row):
     """Generates a Blake2 hash for a given row."""
-    # Concatenate values with a separator to avoid collisions (e.g., hash('01') == hash('0'+'1'))
-    # Ensure all values are converted to string
+
     combined_string = f"{row['latitude']}:{row['longitude']}:{row['name']}"
-    # Encode the string to bytes before hashing
+
     encoded_string = combined_string.encode("utf-8")
-    # Calculate the Blake2 hash and return the hexadecimal digest
+
     return blake2b(encoded_string, digest_size=8).hexdigest()
 
 
@@ -455,7 +438,6 @@ def inject_secure_map_logic(html_string, encrypted_payload):
     and decrypts the map data purely based on user input.
     """
 
-    # 1. WIPE THE PLAINTEXT DATA
     cleansed_html = re.sub(
         r"var\s+data\s*=\s*\[.*?\];",
         "var data = []; /* Plaintext wiped by Python Encryptor */",
@@ -463,7 +445,6 @@ def inject_secure_map_logic(html_string, encrypted_payload):
         flags=re.DOTALL,
     )
 
-    # 2. PREPARE THE SECURE JAVASCRIPT & UI OVERLAY
     secure_js = f"""
     <div id="secure-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 99999; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; font-family: sans-serif;">
         <div style="background: white; padding: 30px; border-radius: 8px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.5); width: 300px;">
@@ -585,8 +566,100 @@ def inject_secure_map_logic(html_string, encrypted_payload):
     final_html = cleansed_html.replace("</body>", secure_js + "\n</body>")
     return final_html
 
+
 def img_uri(img):
     image_file = img
-    with open(image_file, 'rb') as f:
-        encoded = base64.b64encode(f.read()).decode('UTF-8')
-    return f'data:image/png;base64,{encoded}'
+    with open(image_file, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("UTF-8")
+    return f"data:image/png;base64,{encoded}"
+
+
+# Initialize Local Overrides
+COMMON_SURVEY_FIELDS = {
+    'name': 'Entity Name',
+    'fid': 'System Identifier',
+    'uuid': 'System Identifier',
+    'id': 'System Identifier',
+    'start': 'Temporal Metadata',
+    'end': 'Temporal Metadata',
+    'today': 'Temporal Metadata',
+    'date': 'Temporal Metadata',
+    'enumerator': 'Survey Personnel',
+    'country': 'Geographic Location',
+    'governorate': 'Geographic Location',
+    'address': 'Geographic Location',
+    'latitude': 'GeoCoordinates',
+    'longitude': 'GeoCoordinates',
+    'url': 'Web Presence', # Changed from web_url so NLP can match the root noun
+    'link': 'Web Presence'
+}
+
+# ==========================================
+# 2. CORE PIPELINE FUNCTIONS
+# ==========================================
+
+def extract_core_concept(column_name):
+    """Uses NLP to reduce a multi-word column name to its core noun."""
+    clean_name = str(column_name).lower().replace('_', ' ').replace('-', ' ')
+    
+    if len(clean_name.split()) == 1:
+        return clean_name
+        
+    doc = nlp(clean_name)
+    
+    for chunk in doc.noun_chunks:
+        return chunk.root.text
+        
+    nouns = [token.text for token in doc if token.pos_ in ['NOUN', 'PROPN']]
+    if nouns:
+        return nouns[-1] 
+        
+    return clean_name.split()[-1]
+
+def get_schema_taxonomy(column_name):
+    """Classifies a column name using the loaded Schema.org DataFrames."""
+    clean_name = str(column_name).lower().replace('_', '').replace(' ', '')
+    
+    # Check Properties
+    prop_match = props_df[props_df['label'].str.lower() == clean_name]
+    if not prop_match.empty:
+        domain_raw = str(prop_match.iloc[0]['domainIncludes']).split(',')[0]
+        return domain_raw.replace('https://schema.org/', '')
+
+    # Check Types
+    type_match = types_df[types_df['label'].str.lower() == clean_name]
+    if not type_match.empty:
+        parent_raw = str(type_match.iloc[0]['subTypeOf']).split(',')[0]
+        return parent_raw.replace('https://schema.org/', '')
+        
+    return f"Unclassified: {column_name}"
+
+def get_taxonomy_for_pipeline(column_name):
+    """The master waterfall function that controls the logic flow."""
+    # 1. Reduce multi-word phrase to a single concept
+    core_concept = extract_core_concept(column_name)
+    
+    # 2. Check local dictionary
+    if core_concept in COMMON_SURVEY_FIELDS:
+        return COMMON_SURVEY_FIELDS[core_concept]
+        
+    # 3. Query Schema.org
+    return get_schema_taxonomy(core_concept)
+
+# ==========================================
+# 3. VISUALIZATION FUNCTION
+# ==========================================
+
+if __name__ == "__functions__":
+    model_name = "en_core_web_sm"
+    if not is_package(model_name):
+        import spacy.cli
+        spacy.cli.download(model_name)
+    nlp = spacy.load(model_name)
+
+    # Initialize Schema.org Offline Vocabulary
+    print("Loading Schema.org vocabulary into memory...")
+    TYPES_URL = "https://raw.githubusercontent.com/schemaorg/schemaorg/main/data/releases/29.4/schemaorg-current-https-types.csv"
+    PROPS_URL = "https://raw.githubusercontent.com/schemaorg/schemaorg/main/data/releases/29.4/schemaorg-current-https-properties.csv"
+    types_df = pd.read_csv(TYPES_URL)
+    props_df = pd.read_csv(PROPS_URL)

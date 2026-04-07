@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Oct 31 07:51:41 2024
 
@@ -13,21 +11,22 @@ cleaned format suitable for visualization in tabular and map formats.
 """
 
 import pandas as pd
-from __functions__ import ReverseGeocode
-from __visualisations__ import Plot, Tabular
-from metaflow import FlowSpec, Parameter, card, step
+from __functions__ import ReverseGeocode, generate_blake2_uid
+from __visualisations__ import Tabular
+from metaflow import FlowSpec, Parameter, card, step, current
 from okw_libs.dwld import iter_request
+from __metasteps__ import TailSteps
 
 
-class Source_06(FlowSpec):
+class Source_06(FlowSpec, TailSteps):
     """
     Metaflow pipeline class to manage the data flow:
     Extract, clean, and visualize data from the Make.Works API.
     """
 
-    # URL of the Make.Works API with pagination placeholder
-    url = "https://make.works/companies?page={n}&format=json"
-    # Pipeline parameters with default values
+    url = "https://make.works/companies"
+    api_url = "https://make.works/companies?page={n}&format=json"
+
     radius_ = Parameter(
         "radius", default=1, help="Radius value for proximity filtering"
     )
@@ -35,7 +34,9 @@ class Source_06(FlowSpec):
         "min_points", default=3, help="Minimum number of points for proximity filtering"
     )
 
-    render_map_ = Parameter("render_map", default=False)
+    render_map_ = Parameter(
+        "render_map", default=False, help="Whether to render the map visualization"
+    )
 
     @step
     def start(self):
@@ -53,9 +54,9 @@ class Source_06(FlowSpec):
         Extract step.
         Fetches raw data from the Make.Works API and converts it into a DataFrame.
         """
-        self.raw = iter_request(self.url)  # Fetch data from API
-        self.data = pd.DataFrame(self.raw)  # Convert to DataFrame
-        print(self.data.columns.tolist())  # Print column names for debugging
+        self.raw = iter_request(self.api_url)  # Fetch data from API
+        self.data_input = pd.DataFrame(self.raw)  # Convert to DataFrame
+        print(self.data_input.columns.tolist())  # Print column names for debugging
         self.next(self.clean)
 
     @card(type="html")
@@ -65,8 +66,8 @@ class Source_06(FlowSpec):
         Clean step.
         Renames and filters columns to create a standardized output dataset.
         """
-        # Rename columns for clarity and standardization
-        self.data.rename(
+
+        self.data_input.rename(
             columns={
                 "url": "record_source_url",
                 "lat": "latitude",
@@ -75,78 +76,27 @@ class Source_06(FlowSpec):
             },
             inplace=True,
         )
-        print(self.data.columns.tolist())
-        # Select relevant columns for further processing
-        self.data["record_source_url"] = self.data["record_source_url"].str[:-5]
-        self.output = self.data[
+        print(self.data_input.columns.tolist())
+
+        self.data_input["record_source_url"] = self.data_input["record_source_url"].str[:-5]
+        self.data_output = self.data_input[
             ["name", "latitude", "longitude", "record_source_url", "web_url"]
         ]
-        print(self.output.columns.tolist())  # Print column names for debugging
+        print(self.data_output.columns.tolist())  # Print column names for debugging
         self.next(self.transform)
 
     @card(type="html")
     @step
     def transform(self):
-        self.geocode = ReverseGeocode(self.output).get()
+        """Trandforms the cleaned data by performing reverse geocoding to enrich it with location information, and prepares it for visualization."""
+        id = current.flow_name[-2:]
+        self.data_output["source"] = id
+        self.data_output["uid"] = self.data_output.apply(generate_blake2_uid, axis=1)
+        self.geocode = ReverseGeocode(self.data_output).get()
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
 
-    @step
-    def visualise(self):
-        """
-        Visualization step.
-        Routes the cleaned data to tabular and map-based visualization tasks.
-        """
-        self.next(self.data_table, self.data_map)
 
-    @card(type="html")
-    @step
-    def data_table(self):
-        """
-        Tabular visualization step.
-        Converts the cleaned data into an HTML table.
-        """
-        self.html = Tabular(self.output).table_output()  # Generate table visualization
-        self.next(self.join)
-
-    @card(type="html")
-    @step
-    def data_map(self):
-        """
-        Map visualization step.
-        Generates an interactive map from the cleaned data.
-        """
-        # Drop rows with missing latitude/longitude and create a map
-        # visualization
-        if self.render_map_:
-            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
-        self.next(self.join)
-
-    @step
-    def join(self, inputs):
-        """
-        Join step.
-        Combines the outputs of the tabular and map visualizations.
-        """
-        self.output = inputs[
-            0
-        ].output  # Use the output from the first input (data_table)
-        self.next(self.wrapup)
-    
-    @step
-    def wrapup(self):
-        self.output["source"] = "06"
-        print(self.output.shape)
-        print(self.output.columns.tolist())
-        self.next(self.end)
-    
-    @step
-    def end(self):
-        """
-        End step.
-        Finalizes the pipeline and confirms successful execution.
-        """
-        print("Success")
 
 
 if __name__ == "__main__":

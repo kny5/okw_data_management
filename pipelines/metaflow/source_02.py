@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Oct 31 07:51:41 2024
 
@@ -7,13 +5,14 @@ Created on Thu Oct 31 07:51:41 2024
 """
 
 import pandas as pd
-from __functions__ import ReverseGeocode
-from __visualisations__ import Plot, Tabular
-from metaflow import FlowSpec, Parameter, card, step
+from __functions__ import ReverseGeocode, generate_blake2_uid
+from __visualisations__ import Tabular
+from metaflow import FlowSpec, Parameter, card, step, current
 from okw_libs.dwld import req_data
+from __metasteps__ import TailSteps
 
 
-class Source_02(FlowSpec):
+class Source_02(FlowSpec, TailSteps):
     url = "https://api.fablabs.io/0/labs.json"
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
@@ -28,16 +27,15 @@ class Source_02(FlowSpec):
     @step
     def extract(self):
         self.raw = req_data(self.url).json()
-        self.data = pd.DataFrame(self.raw)
-        self.html = Tabular(self.data).table_output()
-        print(self.data.columns.tolist())
+        self.data_input = pd.DataFrame(self.raw)
+        self.html = Tabular(self.data_input).table_output()
+        print(self.data_input.columns.tolist())
         self.next(self.clean)
 
     @step
     def clean(self):
-        filter_10 = self.data[~self.data["activity_status"].isin(["closed", "planned"])]
-        # d_transform = filter_points_by_proximity(n_transform, radius=int(self.radius_), min_points=int(self.min_points_))
-        # self.validata = e_transform[~e_transform.isin(d_transform).all(axis=1)]
+        filter_10 = self.data_input[~self.data_input["activity_status"].isin(["closed", "planned"])]
+
         self.cleaned = filter_10.drop_duplicates(subset=["name"], keep="last")
         self.next(self.transform)
 
@@ -47,55 +45,19 @@ class Source_02(FlowSpec):
         self.cleaned["record_source_url"] = (
             "https://www.fablabs.io/labs/" + self.cleaned.slug
         )
-        # Convert the JSON string in 'links' to a Python object, and then extract the URL
-        # Directly access the first element of the 'links' list, and check for
-        # the 'url' key
+
         self.cleaned["web_url"] = self.cleaned["links"].apply(
             lambda x: x[0]["url"] if isinstance(x, list) and len(x) > 0 else None
         )
-        self.output = self.cleaned[
+        self.data_output = self.cleaned[
             ["name", "latitude", "longitude", "record_source_url", "web_url"]
         ]
-        self.geocode = ReverseGeocode(self.output).get()
+        self.data_output["uid"] = self.data_output.apply(generate_blake2_uid, axis=1)
+        self.geocode = ReverseGeocode(self.data_output).get()
         self.html = Tabular(self.geocode).table_output()
-        
+        id = current.flow_name[-2:]
+        self.data_output["source"] = id
         self.next(self.visualise)
-
-    @step
-    def visualise(self):
-        self.next(self.data_table, self.data_map, self.data_stats)
-
-    @card(type="html")
-    @step
-    def data_table(self):
-        self.html = Tabular(self.output).table_output()
-        self.next(self.wrapup)
-
-    @card(type="html")
-    @step
-    def data_map(self):
-        if self.render_map_:
-            self.html = Plot(self.output).render()
-        self.next(self.wrapup)
-
-    @step
-    def data_stats(self):
-        self.count = "OKW entries: {r[0]}, columns: {r[1]}, info: {c}".format(
-            r=self.output.shape, c=self.output.columns.tolist()
-        )
-        self.next(self.wrapup)
-
-    @step
-    def wrapup(self, inputs):
-        self.output = inputs[0].output
-        self.output["source"] = "02"
-        print(self.output.shape)
-        print(self.output.columns.tolist()) 
-        self.next(self.end)
-
-    @step
-    def end(self):
-        print("Success")
 
 
 if __name__ == "__main__":

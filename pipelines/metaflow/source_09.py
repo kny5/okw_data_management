@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Oct 31 07:51:41 2024
 
@@ -9,13 +7,18 @@ Created on Thu Oct 31 07:51:41 2024
 import json
 import wget
 import pandas as pd
-from __functions__ import ReverseGeocode, extract_link
-from __visualisations__ import Plot, Tabular
+from __functions__ import ReverseGeocode, extract_link, generate_blake2_uid
+from __visualisations__ import Tabular
 from bs4 import BeautifulSoup as soup
-from metaflow import FlowSpec, Parameter, card, step
+from metaflow import FlowSpec, Parameter, card, step, current
+from __metasteps__ import TailSteps
 
-class Source_09(FlowSpec):
-    url = Parameter("url", default="https://wiki.hackerspaces.org/w/api.php?action=parse&oldid=95416&prop=text&format=json&origin=*")
+
+class Source_09(FlowSpec, TailSteps):
+    url = Parameter(
+        "url",
+        default="https://wiki.hackerspaces.org/w/api.php?action=parse&oldid=95416&prop=text&format=json&origin=*",
+    )
     render_map_ = Parameter("render_map", default=False)
 
     @step
@@ -24,7 +27,7 @@ class Source_09(FlowSpec):
 
     @step
     def extract(self):
-        
+
         data_file = wget.download(self.url, out="data/hackerspaces_list.json")
 
         print("Download complete.")
@@ -34,18 +37,18 @@ class Source_09(FlowSpec):
         raw_html = api_response.get("parse", {}).get("text", {}).get("*", "")
         html_parser = soup(raw_html, "html.parser")
         data = html_parser.find("div", {"class": "mapdata"}).text
-        # print(data)
+
         self.raw = json.loads(data).get("locations", [])
-        self.data = pd.json_normalize(self.raw)
-        print(self.data.columns.tolist())
+        self.data_input = pd.json_normalize(self.raw)
+        print(self.data_input.columns.tolist())
         self.next(self.clean)
 
     @card(type="html")
     @step
     def clean(self):
-        self.html = Tabular(self.data).table_output()
+        self.html = Tabular(self.data_input).table_output()
 
-        self.data.rename(
+        self.data_input.rename(
             columns={
                 "lat": "latitude",
                 "lon": "longitude",
@@ -54,56 +57,23 @@ class Source_09(FlowSpec):
             },
             inplace=True,
         )
-        self.data["web_url"] = self.data["text"].apply(extract_link)
-        self.output = self.data[["name", "latitude", "longitude", "web_url"]]
+        self.data_input["web_url"] = self.data_input["text"].apply(extract_link)
+        self.data_output = self.data_input[["name", "latitude", "longitude", "web_url"]]
         self.next(self.transform)
 
     @card(type="html")
     @step
     def transform(self):
-        self.geocode = ReverseGeocode(self.output).get()
+        id = current.flow_name[-2:]
+        self.data_output["source"] = id
+        self.data_output["record_source_url"] = self.data_output.name.apply(
+            lambda x: "https://wiki.hackerspaces.org/" + x.replace(" ", "_")
+        )
+        self.data_output["uid"] = self.data_output.apply(generate_blake2_uid, axis=1)
+        self.geocode = ReverseGeocode(self.data_output).get()
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
 
-    @step
-    def visualise(self):
-        self.next(self.data_table, self.data_map, self.data_stats)
-
-    @card(type="html")
-    @step
-    def data_table(self):
-        self.html = Tabular(self.output).table_output()
-        self.next(self.wrapup)
-
-    @card(type="html")
-    @step
-    def data_map(self):
-        if self.render_map_:
-            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
-        self.next(self.wrapup)
-
-    @step
-    def data_stats(self):
-        self.count = "OKW entries: {r[0]}, columns: {r[1]}, info: {c}".format(
-            r=self.output.shape, c=self.output.columns.tolist()
-        )
-        self.next(self.wrapup)
-
-    @step
-    def wrapup(self, inputs):
-        self.output = inputs[0].output
-        self.output["source"] = "09"
-        self.output["record_source_url"] = self.output.name.apply(
-            lambda x: "https://wiki.hackerspaces.org/" + x.replace(" ", "_")
-        )
-        print(self.output.shape)
-        print(self.output.columns.tolist())
-
-        self.next(self.end)
-
-    @step
-    def end(self):
-        print("Success")
 
 
 if __name__ == "__main__":

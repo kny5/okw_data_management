@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Oct 31 07:51:41 2024
 
@@ -58,19 +56,19 @@ class Source_05(FlowSpec):
             "latitude",
             "longitude",
         ]
-        self.data = pd.DataFrame(self.raw, columns=columns)
-        print(self.data.columns.tolist())
+        self.data_input = pd.DataFrame(self.raw, columns=columns)
+        print(self.data_input.columns.tolist())
         self.next(self.clean)
 
     @step
     def clean(self):
-        self.output = self.data[["name", "latitude", "longitude", "web_url"]]
+        self.data_output = self.data_input[["name", "latitude", "longitude", "web_url"]]
         self.next(self.transform)
 
     @card(type="html")
     @step
     def transform(self):
-        self.geocode = ReverseGeocode(self.output).get()
+        self.geocode = ReverseGeocode(self.data_output).get()
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
 
@@ -81,34 +79,33 @@ class Source_05(FlowSpec):
     @card(type="html")
     @step
     def data_table(self):
-        self.html = Tabular(self.output).table_output()
+        self.html = Tabular(self.data_output).table_output()
         self.next(self.wrapup)
 
     @card(type="html")
     @step
     def data_map(self):
         if self.render_map_:
-            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
+            self.html = Plot(
+                self.data_output.dropna(subset=["latitude", "longitude"])
+            ).render()
         self.next(self.wrapup)
 
     @step
     def data_stats(self):
         self.count = "OKW entries: {r[0]}, columns: {r[1]}, info: {c}".format(
-            r=self.output.shape, c=self.output.columns.tolist()
+            r=self.data_output.shape, c=self.data_output.columns.tolist()
         )
         self.next(self.wrapup)
 
     @step
     def wrapup(self, inputs):
-        self.output = inputs[0].output
-        self.output["source"] = "05"
-        print(self.output.shape)
-        print(self.output.columns.tolist())
+        self.data_output = inputs[0].data_output
+        self.data_output["source"] = "05"
+        print(self.data_output.shape)
+        print(self.data_output.columns.tolist())
         self.next(self.end)
 
-    @step
-    def end(self):
-        print("Success")
 
 
 if __name__ == "__main__":

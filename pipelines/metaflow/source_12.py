@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Oct 31 07:51:41 2024
 
@@ -9,21 +7,33 @@ Created on Thu Oct 31 07:51:41 2024
 import sqlite3
 
 import pandas as pd
-from __functions__ import ReverseGeocode, filter_points_by_proximity, req_data, generate_blake2_uid
+from __functions__ import (
+    ReverseGeocode,
+    filter_points_by_proximity,
+    req_data,
+    generate_blake2_uid,
+)
 from __visualisations__ import Plot, Tabular
 from metaflow import FlowSpec, Parameter, card, step, current
-from metaflow_extensions.profiler.plugins.profile_decorator import profile_card
+from __metasteps__ import TailSteps
 
 
-class Source_12(FlowSpec):
+class Source_12(FlowSpec, TailSteps):
     url = Parameter(
         "url",
         default="https://github.com/kny5/db/raw/refs/heads/db_global/Global.sqlite",
     )
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
-    render_map_ = Parameter("render_map", default=False)
-    benchmark_products = Parameter("find", default="facemask|mask|respirator|ventilator")
+    
+    bypass_geo_filter = Parameter("bypass_geo_filter", default=False)
+    
+    render_map_ = Parameter("render_map", default=True)
+    benchmark_products = Parameter(
+        "find", default="facemask|mask|respirator|ventilator"
+    )
+    keep_data = Parameter("keep_data", default=True)
+
 
     @step
     def start(self):
@@ -42,9 +52,9 @@ class Source_12(FlowSpec):
         self.raw = pd.read_sql_query("SELECT * from field_ready_verified", con)
         self.patch = pd.read_sql_query("SELECT * from patch_01", con)
         print(self.raw.columns.to_list())
+        print(self.raw.shape)
         con.close()
 
-        print(self.raw.info())
         self.html = Tabular(self.raw).table_output()
         self.next(self.clean)
 
@@ -61,108 +71,90 @@ class Source_12(FlowSpec):
         self.raw["longitude"] = pd.to_numeric(
             self.raw["location-Longitude"], errors="coerce"
         )
-        filter_0 = self.raw[
+        drop_unverifiable_data = self.raw[
             ~self.raw["country"].isin(["iraq", "somalia", "somaliland"])
         ]
-        filter_a = pd.concat([filter_0, self.patch], ignore_index=True)
 
-        filter_a = filter_a.dropna(subset=["latitude", "longitude"])
-        filter_1 = filter_a[filter_a["name"].str.len() >= 4]
-        filter_1.rename(columns={"social_fb": "web_url"}, inplace=True)
-        
+        self.data_input = pd.concat([self.raw, self.patch], ignore_index=True)
 
-        filter_2 = filter_1.map(lambda x: x.lower() if isinstance(x, str) else x)
-        
+        patch_verified_data = pd.concat(
+            [drop_unverifiable_data, self.patch], ignore_index=True
+        )
+
+        patch_verified_data = patch_verified_data.dropna(
+            subset=["latitude", "longitude"]
+        )
+        filter_name_len = patch_verified_data[
+            patch_verified_data["name"].str.len() >= 4
+        ]
+        filter_name_len.rename(columns={"social_fb": "web_url"}, inplace=True)
+
+        lower_case_all_strs = filter_name_len.map(
+            lambda x: x.lower() if isinstance(x, str) else x
+        )
+
         noise_keywords = (
             "barber|nail|salon|beauty|spa|boutique|cosmetics|hair|massage|restaurant|"
             "cafe|bar|pub|club|hotel|lodge|motel|grocery|supermarket|pharmacy|bakery|"
-            "laundry|church|mosque|parish|coiffure|alimentation|boulangerie|église"
+            "laundry|church|mosque|parish|coiffure|alimentation|boulangerie|église|cosmetics"
         )
-        filter_b = filter_2[~filter_2["name"].str.contains(noise_keywords, na=False)]
+        filter_negative_keys = lower_case_all_strs[
+            ~lower_case_all_strs["name"].str.contains(noise_keywords, na=False)
+        ]
 
-        # Expanded Positive: Added informal sector terms, Francophone trades, and tech hubs
         positive_keywords = (
             "institute|faculty|college|univeristy|school|workshop|metal|wood|hardware|tailor|lab|innovation|welding|welder|works|"
             "atelier|fablab|maker|tech|hub|repair|garage|mechanic|carpentry|artisan|"
             "sewing|electronics|engineering|machine|fabrication|forge|foundry|cnc|3d|"
             "jua kali|fundi|menuiserie|soudure|mécanique|quincaillerie|usine"
         )
-        filter_c = filter_b[filter_b["name"].str.contains(positive_keywords, na=False)]
+        filter_positive_keys = filter_negative_keys[
+            filter_negative_keys["name"].str.contains(positive_keywords, na=False)
+        ]
 
-        filter_3 = filter_c.drop_duplicates(subset=["name", "latitude", "longitude", "web_url"], keep="last")
-        
-        filter_4 = filter_points_by_proximity(
-            filter_3, radius=self.radius_, min_points=self.min_points_
+        filter_duplicates = filter_positive_keys.drop_duplicates(
+            subset=["name", "latitude", "longitude", "web_url"], keep="last"
         )
-        print(filter_4.columns.tolist())
 
-        self.output = filter_3[~filter_3.isin(filter_4).all(axis=1)]
-        self.output.columns = self.output.columns.str.lower()
+        if not self.bypass_geo_filter:
+            filter_by_geo_proximity = filter_points_by_proximity(
+                filter_duplicates, radius=self.radius_, min_points=self.min_points_
+            )
+        else:
+            filter_by_geo_proximity = pd.DataFrame()
 
-        self.html = Tabular(self.output).table_output()
+        self.data_output = filter_duplicates[
+            ~filter_duplicates.isin(filter_by_geo_proximity).all(axis=1)
+        ]
+        self.data_output.columns = self.data_output.columns.str.lower()
+
+        self.html = Tabular(self.data_output).table_output()
         self.next(self.transform)
 
     @card(type="html")
     @step
     def transform(self):
-        self.geocode = ReverseGeocode(self.output).get()
+        id = current.flow_name[-2:]
+        self.data_output["source"] = id
+        self.data_output["uid"] = self.data_output.apply(generate_blake2_uid, axis=1)
+        self.data_output["record_source_url"] = "https://ggl.link/UkdBlHn"
+        self.geocode = ReverseGeocode(self.data_output).get()
         self.html = Tabular(self.geocode).table_output()
-        self.next(self.give_uid)
-
-    @step
-    def give_uid(self):
-        self.output["uid"] = self.output.apply(generate_blake2_uid, axis=1)
-        self.next(self.visualise)
-    
-    @step
-    def visualise(self):
-        self.next(self.data_table, self.data_map, self.data_stats)
-
-    @card(type="html")
-    @step
-    def data_table(self):
-        self.html = Tabular(self.output).table_output()
-        self.next(self.wrapup)
-
-    @card(type="html")
-    @step
-    def data_map(self):
-        if self.render_map_:
-            self.html = Plot(self.output.dropna(subset=["latitude", "longitude"])).render()
-        self.next(self.wrapup)
-
-    @step
-    def data_stats(self):
-        self.count = "OKW entries: {r[0]}, columns: {r[1]}, info: {c}".format(
-            r=self.output.shape, c=self.output.columns.tolist()
-        )
-        self.next(self.wrapup)
-
-    @step
-    def wrapup(self, inputs):
-        self.output = inputs[0].output
-        self.output["source"] = "12"
-        self.output["record_source_url"] = None
-        print(self.output.columns.to_list())
         self.next(self.find)
-    
-    @card(type='html', id='first')
-    # @card(type='html', id='second')
+
+    @card(type="html")
     @step
     def find(self):
-        print(self.output.columns.to_list())
-        self.benchmark = self.output[self.output["typical_products_of_the_facility"].str.contains(self.benchmark_products, na=False, case=False)].dropna(subset=["latitude", "longitude"])
-        print(self.output.shape)
-        current.card['first'](Table(self.benchmark))
-        # self.map = Plot(self.benchmark).render()
-        
-        # current.card['first'].append(self.table)
-        # current.card['second'].append(self.map)
-        
-        self.next(self.end)
-    @step
-    def end(self):
-        print("Success")
+        self.benchmark = self.data_input[
+            self.data_input["Typical_products_of_the_facility"].str.contains(
+                self.benchmark_products, na=False, case=False
+            )
+        ].dropna(subset=["latitude", "longitude"])
+
+        self.table = Tabular(self.benchmark).table_output()
+        self.html = Plot(self.benchmark).render()
+
+        self.next(self.visualise)
 
 
 if __name__ == "__main__":

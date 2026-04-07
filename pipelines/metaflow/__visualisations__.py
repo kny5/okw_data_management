@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Oct 31 07:51:41 2024
 
@@ -29,7 +27,14 @@ from folium.plugins import (
 )
 from itables import to_html_datatable
 from bs4 import BeautifulSoup as bs
-from __functions__ import img_uri
+from __functions__ import img_uri, get_taxonomy_for_pipeline
+import itertools
+import matplotlib.pyplot as plt
+import base64
+import io
+
+import pandas as pd
+import seaborn as sns
 
 opt.maxBytes = 0
 
@@ -40,32 +45,77 @@ def load_js_file(file_path):
 
 
 class Plot:
-    def __init__(self, dataframe, max_cluster_rad=40):
+    """
+    Plot class for rendering geospatial data on an interactive map using Folium.
+    It includes methods for preparing data, setting up the map, adding points with clustering,
+    and adding legends and counts.
+
+    The class also allows for customization of map tiles and cluster icons through external JavaScript files.
+    """
+
+    def __init__(self, dataframe, max_cluster_rad=40, colorful=False):
         self.icon_cluster = load_js_file("pipelines/metaflow/assets/cluster_icon.js")
         self.callback = load_js_file("pipelines/metaflow/assets/cluster_mod.js")
-        # self.tiles_url = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
-        self.tiles_url = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
-        self.tiles_attribution = "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012"
-        self.data = dataframe
+
+        if colorful:
+            self.tiles_url = (
+                "https://server.arcgisonline.com/ArcGIS/rest/services/"
+                "World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+            )
+            self.tiles_attribution = (
+                "Tiles &copy; Esri &mdash; Source: Esri, DeLorme, "
+                "NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012"
+            )
+        else:
+            self.tiles_url = (
+                "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            )
+            self.tiles_attribution = (
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
+                'contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            )
+
+        self.data_input = dataframe
         self.max_rad = max_cluster_rad
         self.prep_data()
         self.set_map()
         self.add_points()
         self.add_legend()
         self.add_count()
+        self.get_map()
 
     def prep_data(self):
+        """Prepares the data for mapping by ensuring that latitude and longitude values are numeric,
+        and by creating a zip of the relevant columns for clustering."""
 
-        self.output_map = self.data.dropna(subset=["latitude", "longitude"])
-        
+        self.output_map = self.data_input.dropna(subset=["latitude", "longitude"])
+
         print(self.output_map.info(verbose=True))
         print(self.output_map.columns.tolist())
 
-        sources = self.output_map["source"] if "source" in self.output_map.columns else [None] * len(self.output_map)
-        uids = self.output_map["uid"] if "uid" in self.output_map.columns else [None] * len(self.output_map)
-        record_urls = self.output_map["record_source_url"] if "record_source_url" in self.output_map.columns else [None] * len(self.output_map)
-        
-        self.output_map = self.data.dropna(subset=["latitude", "longitude"])
+        sources = (
+            self.output_map["source"]
+            if "source" in self.output_map.columns
+            else [None] * len(self.output_map)
+        )
+        uids = (
+            self.output_map["uid"]
+            if "uid" in self.output_map.columns
+            else [None] * len(self.output_map)
+        )
+        record_urls = (
+            self.output_map["record_source_url"]
+            if "record_source_url" in self.output_map.columns
+            else [None] * len(self.output_map)
+        )
+
+        web_urls = (
+            self.output_map["web_url"]
+            if "web_url" in self.output_map.columns
+            else [None] * len(self.output_map)
+        )
+
+        self.output_map = self.data_input.dropna(subset=["latitude", "longitude"])
 
         try:
             self.zip_data = list(
@@ -74,32 +124,27 @@ class Plot:
                     self.output_map["longitude"],
                     self.output_map["name"],
                     sources,
-                    self.output_map["web_url"],
+                    web_urls,
                     uids,
                     record_urls,
                 )
             )
             print(len(self.zip_data))
             print(self.zip_data[-5:])
-        
+
             self.bounds = [
-            [self.output_map["latitude"].min(), self.output_map["longitude"].min()],
-            [self.output_map["latitude"].max(), self.output_map["longitude"].max()],
-        ]
-        
+                [self.output_map["latitude"].min(), self.output_map["longitude"].min()],
+                [self.output_map["latitude"].max(), self.output_map["longitude"].max()],
+            ]
+
         except Exception as e:
-            # FIX: Print the actual missing key
-            print(f"CRITICAL ERROR: {e}") 
+
+            print(f"CRITICAL ERROR: {e}")
             return False
-        
 
     def set_map(self):
-        # Check for NaN values in latitude and longitude before creating the
-        # map
-        #if (
-            # not np.isnan(self.output_map["latitude"]).any()
-            # and not np.isnan(self.output_map["longitude"]).any()
-        #):
+        """Initializes the Folium map centered around the mean latitude and longitude of the data points,
+        with specified tiles and attributes."""
         try:
             self.m = folium.Map(
                 location=[
@@ -110,8 +155,8 @@ class Plot:
                 tiles=self.tiles_url,
                 attr=self.tiles_attribution,
                 max_zoom=15,
-                world_copy_jump= False,
-                worldCopyJump = False,
+                world_copy_jump=False,
+                worldCopyJump=False,
                 zoomControl=False,
                 prefer_canvas=True,
             )
@@ -120,6 +165,9 @@ class Plot:
             print(e)
 
     def add_points(self):
+        """Adds points to the map using FastMarkerCluster for efficient rendering of large datasets,
+        with custom cluster icons and callbacks defined in external JavaScript files."""
+
         FastMarkerCluster(
             data=self.zip_data,
             icon_create_function=self.icon_cluster,
@@ -128,24 +176,26 @@ class Plot:
         ).add_to(self.m)
 
     def add_legend(self):
+        """Adds a legend to the map by reading an HTML file and embedding it as a Folium element."""
         with open("pipelines/metaflow/assets/legend.html", "r") as f:
             legend_html = f.read()
         self.m.get_root().html.add_child(folium.Element(legend_html))
 
     def add_count(self):
+        """Adds a count of the data points to the map by reading an HTML file and embedding it as a Folium element."""
         with open("pipelines/metaflow/assets/count.html", "r") as f:
             count_html = f.read()
         self.m.get_root().html.add_child(folium.Element(count_html))
 
-    def render(self):
-        
+    def get_map(self):
+        """Renders the map as an HTML string, with an additional floating image and controls for measuring and locating."""
         FloatImage(
             img_uri("pipelines/metaflow/assets/dm_odk.gif"),
             bottom=3,
             left=3,
         ).add_to(self.m)
         MeasureControl(position="bottomright").add_to(self.m)
-        # Geocoder(position="topleft").add_to(self.m)
+
         LocateControl(position="topleft").add_to(self.m)
         Fullscreen(
             position="topright",
@@ -153,16 +203,40 @@ class Plot:
             title_cancel="Exit",
             force_separate_button=True,
         ).add_to(self.m)
+
+    def render(self):
         return self.m.get_root().render()
+
+    def into_html(self):
+        """Renders the map as an HTML string."""
+        return self.m._repr_html_()
+
+    def base64_iframe(self):
+        """Renders the map as a base64-encoded HTML string suitable for embedding in an iframe."""
+        map_html = self.render()
+        b64_html = base64.b64encode(map_html.encode("utf-8")).decode("utf-8")
+
+        iframe = f"""
+                <div style="display: flex; justify-content: center; align-items: center; width: 100%;">
+                    <iframe src="data:text/html;base64,{b64_html}" 
+                            width="100%" 
+                            height="800px" 
+                            style="border:none;">
+                    </iframe>
+                </div>
+                """
+        return iframe
 
 
 class Tabular:
+    """Tabular class for rendering a DataFrame as an interactive HTML table using itables."""
+
     def __init__(self, dataframe):
-        self.data = dataframe
+        self.data_input = dataframe
 
     def table_output(self):
         table_html = to_html_datatable(
-            self.data,
+            self.data_input,
             display_logo_when_loading=True,
             buttons=[
                 "pageLength",
@@ -171,6 +245,22 @@ class Tabular:
             ],
         )
         return table_html
+    
+    def base64_iframe(self):
+        """Renders the map as a base64-encoded HTML string suitable for embedding in an iframe."""
+        tab_html = self.table_output()
+        b64_html = base64.b64encode(tab_html.encode("utf-8")).decode("utf-8")
+
+        iframe = f"""
+                <div style="display: flex; justify-content: center; align-items: center; width: 100%;">
+                    <iframe src="data:text/html;base64,{b64_html}" 
+                            width="100%" 
+                            height="300px" 
+                            style="border:none;">
+                    </iframe>
+                </div>
+                """
+        return iframe
 
 
 def extract_map_data_from_string(html_string, js_filename="cluster_data.js"):
@@ -182,31 +272,26 @@ def extract_map_data_from_string(html_string, js_filename="cluster_data.js"):
         tuple: (modified_html_string, extracted_js_content)
                If the specific script is not found, extracted_js_content will be None.
     """
-    # 1. Parse the HTML string directly
+
     soup = bs(html_string, "html.parser")
 
-    # 2. Find the target <script> tag containing 'var data ='
     target_script = None
     for script in soup.find_all("script"):
         if script.string and "var data =" in script.string:
             target_script = script
             break
 
-    # 3. Handle the case where the data isn't found
     if not target_script:
         print("Could not find a script block containing 'var data ='.")
-        # Return the original HTML untouched, and None for the JS
+
         return html_string, None
 
-    # 4. Extract the JavaScript content
     js_content = target_script.string.strip()
 
-    # 5. Modify the HTML script tag to point to the external file
     target_script.string = ""  # Clear the inline data
     target_script["src"] = js_filename  # Link to the external file
     target_script["defer"] = "true"  # Ensure it loads after the HTML
 
-    # 6. Return the updated HTML string and the raw JS string
     return str(soup), js_content
 
 
@@ -226,7 +311,7 @@ def extract_map_data_to_js(html_filepath, output_js_filename="map_data.js"):
 
     target_script = None
     for script in soup.find_all("script"):
-        # We check if the script has text inside and contains our specific variable
+
         if script.string and "var data =" in script.string:
             target_script = script
             break
@@ -254,22 +339,145 @@ def extract_map_data_to_js(html_filepath, output_js_filename="map_data.js"):
     print(f"Successfully updated HTML file to link to {output_js_filename}.")
 
 
-# print(output["country_code"].value_counts().nlargest(10))
+def generate_sparsity_plots(source_list, labels=None):
+    """
+    Generates sparsity plots for a list of source objects.
 
-# import pycountry_convert as pcountry
+    Args:
+        source_list (list): List of objects, each containing '.data' and '.output' DataFrames.
+        labels (list, optional): List of strings to label each source.
+    """
+    plt.rcParams["font.family"] = "sans-serif"
+    plt.rcParams["font.size"] = 8
+    plt.rcParams["axes.linewidth"] = 1
 
-# def get_continent(country_alpha2):
-#     continent_code = pcountry.country_alpha2_to_continent_code(country_alpha2)
-#     continent_name = pcountry.convert_continent_code_to_continent_name(continent_code)
-#     return continent_name
+    colors = itertools.cycle(
+        ["black", "#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e"]
+    )
 
-# output_db['continent'] = output_db['country_code'].apply(get_continent)
-# grouped_db = output_db.groupby(['continent', 'country_code']).size().reset_index(name='Location Count')
-# top_three_db = (
-#     grouped_db
-#     .sort_values(['continent', 'Location Count'], ascending=[True, False])
-#     .groupby('continent')
-#     .head(3)
-# )
+    fig1, ax1 = plt.subplots(figsize=(6.5, 3))
 
-# top_three_db
+    bar_labels = []
+    avg_row_nulls_pct = []
+    bar_colors = []
+    bar_hatches = []
+
+    for i, source in enumerate(source_list):
+        current_color = next(colors)
+
+        data_df = source.data_input
+        output_df = source.data_output
+
+        stages = [("Data", data_df, "--"), ("Output", output_df, "-")]
+
+        for stage_name, df, linestyle in stages:
+            if not df.empty:
+                col_nulls = (df.isnull().mean() * 100).sort_values(ascending=False)
+                x = np.arange(len(col_nulls))
+
+                label_text = f"({stage_name})"
+                ax1.plot(
+                    x,
+                    col_nulls,
+                    label=label_text,
+                    color=current_color,
+                    linestyle=linestyle,
+                    linewidth=1.5,
+                )
+                ax1.fill_between(x, col_nulls, color=current_color, alpha=0.05)
+
+            bar_labels.append(f"({stage_name})")
+            avg_pct = (df.isnull().mean(axis=1).mean() * 100) if not df.empty else 0
+            avg_row_nulls_pct.append(avg_pct)
+
+            bar_colors.append(current_color)
+            bar_hatches.append("" if stage_name == "Data" else "///")
+
+    ax1.set_ylabel("% Nulls")
+    ax1.set_xlabel("Columns (Sorted by Sparsity)")
+    ax1.set_title("Column Sparsity Profile")
+    ax1.set_xticks([])
+    ax1.set_ylim(0, 105)
+
+    ax1.legend(loc="center left", bbox_to_anchor=(1, 0.5), frameon=False, fontsize=7)
+    plt.tight_layout()
+    fig1.savefig("nulls_by_column_profile.png", dpi=100, bbox_inches="tight")
+
+    fig2, ax2 = plt.subplots(figsize=(6, 3))
+
+    bars = ax2.bar(
+        bar_labels, avg_row_nulls_pct, color="white", linewidth=1.5, width=0.6
+    )
+
+    for bar, hatch, color in zip(bars, bar_hatches, bar_colors):
+        bar.set_hatch(hatch)
+        bar.set_edgecolor(color)
+
+    ax2.set_ylabel("Avg % Nulls / Row")
+    ax2.set_title("Row-Level Sparsity Reduction")
+    ax2.set_ylim(0, 105)
+
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+
+    print("Dynamic visualizations generated successfully.")
+
+    buffer = io.BytesIO()
+    fig2.savefig(buffer, format="png", dpi=100, bbox_inches="tight")
+
+    return fig2, fig1
+
+
+
+
+def graph_dataframe_relationships(dataframes, df_names=None):
+    n = len(dataframes)
+    if df_names is None:
+        df_names = [f"DF {i+1}" for i in range(n)]
+
+    dataset_contents = {}
+
+    print(f"Analyzing {n} DataFrames...")
+
+    # 1. Extract and Classify
+    for name, df in zip(df_names, dataframes):
+        print(f"Processing {name}...")
+        classified_columns = []
+        for col in df.columns.tolist():
+            tax_class = get_taxonomy_for_pipeline(col)
+            classified_columns.append(tax_class)
+            
+        dataset_contents[name] = set(classified_columns)
+
+    print("\nTaxonomy Mapping Complete. Generating Heatmap...")
+
+    # 2. Build the Co-occurrence Matrix
+    matrix = pd.DataFrame(index=df_names, columns=df_names, dtype=int)
+    
+    for name1 in df_names:
+        for name2 in df_names:
+            # Count how many semantic concepts these two dataframes share
+            overlap = len(dataset_contents[name1].intersection(dataset_contents[name2]))
+            matrix.loc[name1, name2] = overlap
+
+    # 3. Visualize using Seaborn
+    plt.figure(figsize=(12, 10))
+    
+    # Optional: Mask the top right triangle since it's a mirrored matrix
+    mask = np.triu(np.ones_like(matrix, dtype=bool), k=1)
+
+    sns.heatmap(
+        matrix, 
+        mask=mask, 
+        annot=True,     # Show the numbers in the boxes
+        cmap="Blues",   # Use a clean blue gradient
+        fmt="g",        # CHANGED: 'g' handles both ints and NaN-floats gracefully
+        cbar_kws={'label': 'Number of Shared Semantic Classes'}
+    )
+    
+    plt.title("Semantic Intersection Between DataFrames", fontsize=16, pad=20)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.show()
+
+    return dataset_contents
