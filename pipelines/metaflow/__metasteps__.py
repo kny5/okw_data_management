@@ -30,7 +30,7 @@ class TailSteps:
             current.card.append(Markdown(Plot(self.data_output).base64_iframe()))
         self.next(self.wrapup)
 
-    @card(type="blank")
+    @card #(type="blank")
     @step
     def data_stats(self):
         """Calculates sparsity metrics and saves them as a table artifact."""
@@ -40,7 +40,8 @@ class TailSteps:
         markdown_text = (
             f"# Data Sparsity Analysis for {current.flow_name}"
             f"{url_line}"
-            f"\n\n### Total Records: {len(self.data_output)}"
+            f"\n\n### Records: \n\nInput:\nColumns: {len(self.data_input.columns.tolist())}\nRecords: {len(self.data_input)}"
+            f"\n\nOutput: {len(self.data_output.columns.tolist())}\nRecords: {len(self.data_output)}"
         )
         current.card.append(Markdown(markdown_text))
         

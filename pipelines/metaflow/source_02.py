@@ -34,9 +34,9 @@ class Source_02(FlowSpec, TailSteps):
 
     @step
     def clean(self):
-        filter_10 = self.data_input[~self.data_input["activity_status"].isin(["closed", "planned"])]
+        remove_notactive = self.data_input[~self.data_input["activity_status"].isin(["closed", "planned"])]
 
-        self.cleaned = filter_10.drop_duplicates(subset=["name"], keep="last")
+        self.cleaned = remove_notactive.drop_duplicates(subset=["name"], keep="last")
         self.next(self.transform)
 
     @card(type="html")

@@ -368,7 +368,7 @@ def generate_sparsity_plots(source_list, labels=None):
         data_df = source.data_input
         output_df = source.data_output
 
-        stages = [("Data", data_df, "--"), ("Output", output_df, "-")]
+        stages = [("Input", data_df, "--"), ("Output", output_df, "-")]
 
         for stage_name, df, linestyle in stages:
             if not df.empty:
@@ -391,7 +391,7 @@ def generate_sparsity_plots(source_list, labels=None):
             avg_row_nulls_pct.append(avg_pct)
 
             bar_colors.append(current_color)
-            bar_hatches.append("" if stage_name == "Data" else "///")
+            bar_hatches.append("" if stage_name == "Input" else "///")
 
     ax1.set_ylabel("% Nulls")
     ax1.set_xlabel("Columns (Sorted by Sparsity)")
@@ -429,25 +429,20 @@ def generate_sparsity_plots(source_list, labels=None):
 
 
 
-
-def graph_dataframe_relationships(dataframes, df_names=None):
+def graph_dataframe_relationships(dataframes, data_init, df_names=None):
     n = len(dataframes)
     if df_names is None:
         df_names = [f"DF {i+1}" for i in range(n)]
 
     dataset_contents = {}
-
-    print(f"Analyzing {n} DataFrames...")
-
-    # 1. Extract and Classify
     for name, df in zip(df_names, dataframes):
-        print(f"Processing {name}...")
-        classified_columns = []
-        for col in df.columns.tolist():
-            tax_class = get_taxonomy_for_pipeline(col)
-            classified_columns.append(tax_class)
-            
-        dataset_contents[name] = set(classified_columns)
+        classified = set()
+        for col in df.columns:
+            tax = get_taxonomy_for_pipeline(col, data_init)
+            # Drop noise and unclassified — they corrupt similarity scores
+            if not tax.startswith('Unclassified') and tax != '_noise':
+                classified.add(tax)
+        dataset_contents[name] = classified
 
     print("\nTaxonomy Mapping Complete. Generating Heatmap...")
 
@@ -461,7 +456,7 @@ def graph_dataframe_relationships(dataframes, df_names=None):
             matrix.loc[name1, name2] = overlap
 
     # 3. Visualize using Seaborn
-    plt.figure(figsize=(12, 10))
+    fig = plt.figure(figsize=(12, 10))
     
     # Optional: Mask the top right triangle since it's a mirrored matrix
     mask = np.triu(np.ones_like(matrix, dtype=bool), k=1)
@@ -478,6 +473,72 @@ def graph_dataframe_relationships(dataframes, df_names=None):
     plt.title("Semantic Intersection Between DataFrames", fontsize=16, pad=20)
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    plt.show()
+    buffer = io.BytesIO()
+    
+    fig.savefig(buffer, format="png", dpi=100, bbox_inches="tight")
+    plt.close(fig)
+    return dataset_contents, fig
 
-    return dataset_contents
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.spatial.distance import pdist
+
+def plot_semantic_dendrogram(dataset_contents):
+    """
+    Takes the dataset_contents dictionary and plots a hierarchical 
+    clustering dendrogram based on semantic concept overlap.
+    """
+    print("Extracting features for hierarchical clustering...")
+    
+    # 1. Get all unique semantic concepts across all dataframes
+    all_concepts = set()
+    # FIXED: Iterate over the dictionary values, not .columns
+    for concepts in dataset_contents.values():
+        all_concepts.update(concepts)
+        
+    # 2. Build a binary feature matrix
+    # Rows: DataFrames, Columns: Concepts (1 = has concept, 0 = missing)
+    feature_data = []
+    # FIXED: Explicitly grab the dictionary keys
+    df_names = list(dataset_contents.keys())
+    
+    for name in df_names:
+        row = {concept: (1 if concept in dataset_contents[name] else 0) for concept in all_concepts}
+        feature_data.append(row)
+        
+    feature_matrix = pd.DataFrame(feature_data, index=df_names)
+    
+    print("Calculating linkage and rendering Dendrogram...")
+
+    # 3. Calculate distance and linkage
+    distance_matrix = pdist(feature_matrix, metric='jaccard')
+    linked = linkage(distance_matrix, method='average')
+    
+    # 4. Render the Dendrogram
+    fig = plt.figure(figsize=(12, 8))
+    
+    dendrogram(
+        linked,
+        orientation='top',
+        labels=df_names,
+        distance_sort='descending',
+        leaf_font_size=12,
+        show_leaf_counts=True,
+        color_threshold=0.3 * max(linked[:, 2]) 
+    )
+    
+    plt.title("Hierarchical Clustering of DataFrames", fontsize=16, pad=20)
+    plt.xlabel("Data Sources", fontsize=14, labelpad=15)
+    plt.ylabel("Jaccard Distance", fontsize=12)
+    plt.xticks(rotation=45, ha='right')
+    
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.tight_layout()
+    
+    # Save a physical copy to your machine
+    fig.savefig("semantic_dendrogram.png", dpi=300, bbox_inches='tight')
+    
+    plt.close(fig)
+    return fig

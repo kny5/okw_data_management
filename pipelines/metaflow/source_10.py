@@ -29,28 +29,28 @@ class Source_10(FlowSpec, TailSteps):
     @step
     def extract(self):
         data = req_data(self.url).json()
-        self.raw = pd.json_normalize(data, "data")
+        self.data_input = pd.json_normalize(data, "data")
         self.next(self.clean)
 
     @card(type="html")
     @step
     def clean(self):
-        rn = self.raw.rename(
+        self.data_input.rename(
             columns={
                 "id": "makery_id",
                 "site_web": "web_url",
                 "geo.latitude": "latitude",
                 "geo.longitude": "longitude",
-            }
+            }, inplace=True
         )
-        filtered = rn[rn["status"] != "closed"]
+        filtered = self.data_input[self.data_input["status"] != "closed"]
         self.duplicates = filter_points_by_proximity(
             filtered, radius=int(self.radius_), min_points=int(self.min_points_)
         )
         self.html = Tabular(self.duplicates).table_output()
-        self.data_input = filtered[["name", "latitude", "longitude", "web_url", "makery_id"]]
-        print(self.data_input.columns.tolist())
-        self.data_output = self.data_input[~self.data_input.isin(self.duplicates).all(axis=1)]
+        self.data_output = filtered[["name", "latitude", "longitude", "web_url", "makery_id"]]
+        print(self.data_output.columns.tolist())
+        self.data_output = self.data_output[~self.data_output.isin(self.duplicates).all(axis=1)]
 
         self.next(self.transform)
 

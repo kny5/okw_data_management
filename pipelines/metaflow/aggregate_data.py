@@ -28,16 +28,25 @@ import pandas as pd
 from __functions__ import (
     ReverseGeocode,
     cluster_and_aggregate,
+    inspect_classification,
     obfuscate_text,
     inject_secure_map_logic,
     generate_blake2_uid,
 )
-from __visualisations__ import Plot, Tabular, graph_dataframe_relationships
-from metaflow import Flow, FlowSpec, card, resources, step, Parameter, Runner
-
+from __visualisations__ import Plot, Tabular, graph_dataframe_relationships, plot_semantic_dendrogram
+from metaflow import Flow, FlowSpec, card, resources, step, Parameter, Runner, current
+from metaflow.cards import Markdown, Image
 LOAD_HTML = None
 
+TYPES_URL = "https://raw.githubusercontent.com/schemaorg/schemaorg/main/data/releases/29.4/schemaorg-current-https-types.csv"
+PROPS_URL = "https://raw.githubusercontent.com/schemaorg/schemaorg/main/data/releases/29.4/schemaorg-current-https-properties.csv"
+print("Loading Schema.org vocabulary into memory...")
 
+types_df = pd.read_csv(TYPES_URL)
+props_df = pd.read_csv(PROPS_URL)
+
+
+INIT_DATA = {'types_url': types_df, 'props_url': props_df}
 
 SOURCES = [
     "Source_02",
@@ -68,65 +77,65 @@ class JoinData01(FlowSpec):
         self.sources = SOURCES
 
         self.next(self.get_or_generate_data, foreach="sources")
-@step
-def get_or_generate_data(self):
-    """Fetches existing data for a given source or generates it via Runner."""
-    source_name = self.input
-    print(f"Processing source: {source_name}")
+    
+    @step
+    def get_or_generate_data(self):
+    
+        source_name = self.input
+        
+        print(f"Processing source: {source_name}")
 
-    try:
-        if self.recreate:
-            raise Exception("Recreation requested")
-        run_data = Flow(source_name).latest_successful_run.data
-        print(f"Fetched existing data for {source_name}")
-    except Exception:
-        path = f"pipelines/metaflow/{source_name.lower()}.py"
-        print(f"Running {path} via Runner...")
-        with Runner(path).run() as running:
-            if running.status == "successful":
-                print(f"{running.run} finished successfully.")
-                run_data = running.run.data
+        try:
+            if self.recreate:
+                raise Exception("Recreation requested")
+            run_data = Flow(source_name).latest_successful_run.data
+            print(f"✅ Fetched existing data for {source_name}")
+        except Exception:
+            path = f"pipelines/metaflow/{source_name.lower()}.py"
+            print(f"🔄 Running {path} via Runner...")
+            with Runner(path).run() as running:
+                if running.status == "successful":
+                    print(f"✅ {running.run} finished successfully.")
+                    run_data = running.run.data
+                else:
+                    raise Exception(
+                        f"❌ {running.run} failed with status: {running.status}"
+                    )
+
+        # ✅ Unwrap into top-level artifacts so concatenate can see them via inp.data_output
+        self.data_output = run_data.data_output
+        self.data_input  = run_data.data_input
+        self.next(self.concatenate)
+
+    @card
+    @step
+    def concatenate(self, inputs):
+        """Concatenates data from all sources into a single DataFrame."""
+        self.lazy_output_dfs = []
+        self.lazy_input_dfs = []
+
+        for inp in inputs:
+            if hasattr(inp, 'data_output'):
+                out_df = inp.data_output
+                if isinstance(out_df, pd.DataFrame) and not out_df.empty:
+                    self.lazy_output_dfs.append(out_df)
+                else:
+                    print(f"Skipping data_output from {inp.data_input}: not a DataFrame or empty")
             else:
-                raise Exception(
-                    f"{running.run} failed with status: {running.status}"
-                )
+                print(f"No data_output on branch: {inp.data_input}")
 
-    # Unwrap here — expose as direct artifacts on THIS step
-    self.data_output = run_data.data_output
-    self.data_input  = run_data.data_input
-    self.next(self.concatenate)
+            if hasattr(inp, 'data_input'):
+                in_df = inp.data_input
+                if isinstance(in_df, pd.DataFrame) and not in_df.empty:
+                    self.lazy_input_dfs.append(in_df)
 
+        if not self.lazy_output_dfs:
+            raise ValueError("No valid data_output DataFrames found. Check upstream steps.")
 
-@step
-def concatenate(self, inputs):
-    """Concatenates data from all sources into a single DataFrame."""
-    lazy_output_dfs = []
-    lazy_input_dfs = []
+        self.append_source = pd.concat(self.lazy_output_dfs, ignore_index=True)
+        
+        self.next(self.clean)
 
-    for inp in inputs:
-        if hasattr(inp, 'data_output'):
-            out_df = inp.data_output
-            if isinstance(out_df, pd.DataFrame) and not out_df.empty:
-                lazy_output_dfs.append(out_df)
-            else:
-                print(f"Skipping data_output from {inp.input}: not a DataFrame or empty")
-        else:
-            print(f"No data_output on branch: {inp.input}")
-
-        if hasattr(inp, 'data_input'):
-            in_df = inp.data_input
-            if isinstance(in_df, pd.DataFrame) and not in_df.empty:
-                lazy_input_dfs.append(in_df)
-
-    if not lazy_output_dfs:
-        raise ValueError("No valid data_output DataFrames found. Check upstream steps.")
-
-    self.append_source = pd.concat(lazy_output_dfs, ignore_index=True)
-    self.classified_data = graph_dataframe_relationships(
-        dataframes=lazy_input_dfs,
-        df_names=SOURCES
-    )
-    self.next(self.clean)
     @step
     def clean(self):
         """Cleans the concatenated data by filtering out rows with missing latitude or longitude, and then applies clustering and aggregation to group nearby points."""
@@ -195,14 +204,41 @@ def concatenate(self, inputs):
     @card
     @step
     def data_stats(self):
+        global types_df, props_df
         """Generates statistics about the output data, such as the count of entries and the most common words in the 'name' column."""
         self.most_common_words = (
             self.data_output["name"].str.split().explode().value_counts().head(20)
         )
 
-        self.classified_data
+        self.classified_data = graph_dataframe_relationships(
+            dataframes=self.lazy_input_dfs,
+            data_init=INIT_DATA,
+            df_names=SOURCES
+        )
 
         print(self.most_common_words)
+
+        """Calculates metrics and generates the Dendrogram card."""
+        
+        current.card.append(Markdown("# DataFrame Taxonomy Clustering"))
+
+        dendrogram_fig = plot_semantic_dendrogram(self.classified_data[0])
+        
+        current.card.append(Markdown("The dendrogram above shows how the datasets cluster together based on the semantic similarity of their columns. Datasets that share more similar column names and concepts are grouped closer together."))
+        current.card.append(Image.from_matplotlib(dendrogram_fig))
+
+        current.card.append(Markdown("# DataFrame Relationship Graph"))
+        current.card.append(Markdown("This graph visualizes the relationships between the different datasets based on shared columns and semantic similarity."))
+        current.card.append(Image.from_matplotlib(self.classified_data[1]))
+
+        current.card.append(Markdown(str(self.classified_data[0])))
+
+        full_map = inspect_classification(INIT_DATA, self.lazy_input_dfs, df_names=SOURCES)
+
+        current.card.append(Markdown("# Full Classification Map"))
+        current.card.append(Markdown("This map shows the classification of all columns across the datasets to inspect how they relate to each other and to common concepts in the manufacturing domain."))
+        current.card.append(Markdown(str(full_map)))
+
         self.next(self.wrap_up)
 
     @step
@@ -235,12 +271,20 @@ def concatenate(self, inputs):
 
         self.next(self.wrap_up)
 
+    @card
     @step
     def wrap_up(self, inputs):
-        """Final step to ensure that the output DataFrame is available for any subsequent steps or for inspection at the end of the flow."""
-        self.data_output = inputs[
-            0
-        ].output  # Ensuring `self.data_output` is carried forward to end
+        """Finalizes the output data by safely propagating the dataframes."""
+        
+        # Iterate to safely find the artifacts rather than blindly trusting inputs[0]
+        for inp in inputs:
+            if hasattr(inp, 'data_output'):
+                self.data_output = inp.data_output
+            if hasattr(inp, 'data_input'):
+                self.data_input = inp.data_input
+                
+        print(self.data_output.shape)
+        print(self.data_output.columns.tolist())
         self.next(self.end)
 
     @step
@@ -250,7 +294,6 @@ def concatenate(self, inputs):
         print(self.data_output.shape)
         print(self.data_output.columns.tolist())
         print(self.data_output.tail(5))
-
 
 if __name__ == "__main__":
     JoinData01()

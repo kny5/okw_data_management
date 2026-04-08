@@ -22,11 +22,19 @@ from sklearn.cluster import DBSCAN
 import spacy
 from spacy.util import is_package
 
-
 import matplotlib.colors as mcolors
 import math
 
 _original_to_rgba = mcolors.to_rgba
+
+
+
+MODEL = "en_core_web_sm"
+if not is_package(MODEL):
+    spacy.cli.download(MODEL)
+
+nlp = spacy.load(MODEL)
+
 
 def _safe_to_rgba(c, alpha=None):
     try:
@@ -575,58 +583,231 @@ def img_uri(img):
 
 
 # Initialize Local Overrides
-COMMON_SURVEY_FIELDS = {
-    'name': 'Entity Name',
-    'fid': 'System Identifier',
-    'uuid': 'System Identifier',
-    'id': 'System Identifier',
-    'start': 'Temporal Metadata',
-    'end': 'Temporal Metadata',
-    'today': 'Temporal Metadata',
-    'date': 'Temporal Metadata',
-    'enumerator': 'Survey Personnel',
-    'country': 'Geographic Location',
-    'governorate': 'Geographic Location',
-    'address': 'Geographic Location',
-    'latitude': 'GeoCoordinates',
-    'longitude': 'GeoCoordinates',
-    'url': 'Web Presence', # Changed from web_url so NLP can match the root noun
-    'link': 'Web Presence'
+# Single lookup table. Priority: exact full column name → core concept → Schema.org fallback.
+# Prefix keys with '*' to mark them as core-concept matches (post-NLP extraction).
+# No prefix = exact full column name match (checked first, before NLP).
+
+# Your complete domain taxonomy — no Schema.org dependency
+FIELD_TAXONOMY = {
+
+    # ── IDENTITY ──────────────────────────────────────────────
+    '*name':            'Identity',
+    '*title':           'Identity',
+    '*label':           'Identity',
+    '*kind':            'Identity',
+
+    # ── SYSTEM ────────────────────────────────────────────────
+    '*id':              'SystemField',
+    '*fid':             'SystemField',
+    '*uuid':            'SystemField',
+    '*uid':             'SystemField',
+    '*nsid':            'SystemField',
+    '*slug':            'SystemField',
+    '*sourcekey':       'SystemField',
+    '*delete':          'SystemField',
+    '*number':          'SystemField',
+    '*bucket':          'SystemField',
+
+    # ── TEMPORAL ──────────────────────────────────────────────
+    '*start':           'Temporal',
+    '*end':             'Temporal',
+    '*today':           'Temporal',
+    '*date':            'Temporal',
+    '*createdat':       'Temporal',
+    '*updatedat':       'Temporal',
+    '*year':            'Temporal',
+    '*founded':         'Temporal',
+
+    # ── LOCATION ──────────────────────────────────────────────
+    '*country':         'Location',
+    '*governorate':     'Location',
+    '*address':         'Location',
+    '*street':          'Location',
+    '*fulladdress':     'Location',
+    '*village':         'Location',
+    '*district':        'Location',
+    '*county':          'Location',
+    '*parish':          'Location',
+    '*postcode':        'Location',
+    '*zip':             'Location',
+    '*city':            'Location',
+    '*state':           'Location',
+    '*code':            'Location',
+    '*location':        'Location',
+
+    # ── COORDINATES ───────────────────────────────────────────
+    '*latitude':        'Coordinates',
+    '*longitude':       'Coordinates',
+    '*lat':             'Coordinates',
+    '*long':            'Coordinates',
+    '*lng':             'Coordinates',
+    '*altitude':        'Coordinates',
+    '*accuracy':        'Coordinates',
+
+    # ── CONTACT ───────────────────────────────────────────────
+    '*phone':           'Contact',
+    '*telephone':       'Contact',
+    '*email':           'Contact',
+    '*contact':         'Contact',
+
+    # ── ONLINE PRESENCE ───────────────────────────────────────
+    '*url':             'OnlinePresence',
+    '*link':            'OnlinePresence',
+    '*website':         'OnlinePresence',
+    '*web':             'OnlinePresence',
+    '*twitter':         'OnlinePresence',
+    '*facebook':        'OnlinePresence',
+    '*instagram':       'OnlinePresence',
+    '*linkedin':        'OnlinePresence',
+    '*youtube':         'OnlinePresence',
+    '*flickr':          'OnlinePresence',
+    '*pinterest':       'OnlinePresence',
+    '*social':          'OnlinePresence',
+    '*fb':              'OnlinePresence',
+    '*insta':           'OnlinePresence',
+
+    # ── DESCRIPTION ───────────────────────────────────────────
+    '*description':     'Description',
+    '*intro':           'Description',
+    '*blurb':           'Description',
+    '*desc':            'Description',
+    '*bio':             'Description',
+    '*text':            'Description',
+    '*background':      'Description',
+
+    # ── MEDIA ─────────────────────────────────────────────────
+    '*image':           'Media',
+    '*images':          'Media',
+    '*img':             'Media',
+    '*photo':           'Media',
+    '*portrait':        'Media',
+    '*logo':            'Media',
+    '*icon':            'Media',
+    '*film':            'Media',
+    '*video':           'Media',
+
+    # ── CLASSIFICATION ────────────────────────────────────────
+    '*type':            'Classification',
+    '*category':        'Classification',
+    '*categories':      'Classification',
+    '*kind':            'Classification',
+
+    # ── OPERATIONAL STATUS ────────────────────────────────────
+    '*status':          'OperationalStatus',
+    '*condition':       'OperationalStatus',
+    '*activity':        'OperationalStatus',
+    '*ready':           'OperationalStatus',
+
+    # ── FACILITY METRICS ──────────────────────────────────────
+    '*capacity':        'FacilityMetrics',
+    '*headcount':       'FacilityMetrics',
+    '*staff':           'FacilityMetrics',
+    '*surface':         'FacilityMetrics',
+    '*size':            'FacilityMetrics',
+    '*floor':           'FacilityMetrics',
+
+    # ── OPERATING SCHEDULE ────────────────────────────────────
+    '*hours':           'Schedule',
+    '*openhours':       'Schedule',
+    '*days':            'Schedule',
+    '*schedule':        'Schedule',
+
+    # ── MANUFACTURING PROCESS ─────────────────────────────────
+    '*process':         'ManufacturingProcess',
+    '*production':      'ManufacturingProcess',
+    '*run':             'ManufacturingProcess',
+    '*batch':           'ManufacturingProcess',
+    '*turnaround':      'ManufacturingProcess',
+    '*sample':          'ManufacturingProcess',
+    '*order':           'ManufacturingProcess',
+
+    # ── EQUIPMENT ─────────────────────────────────────────────
+    '*equipment':       'Equipment',
+    '*machine':         'Equipment',
+    '*generator':       'Equipment',
+    '*dock':            'Equipment',
+    '*maintenance':     'Equipment',
+    '*power':           'Equipment',
+    '*supply':          'Equipment',
+    '*model':           'Equipment',
+    '*serial':          'Equipment',
+
+    # ── MATERIALS ─────────────────────────────────────────────
+    '*material':        'Material',
+    '*materials':       'Material',
+    '*plastic':         'Material',
+    '*metal':           'Material',
+    '*wood':            'Material',
+    '*elastomer':       'Material',
+    '*ceramics':        'Material',
+    '*electronics':     'Material',
+
+    # ── FACILITY ACCESS ───────────────────────────────────────
+    '*access':          'FacilityAccess',
+    '*wheelchair':      'FacilityAccess',
+    '*road':            'FacilityAccess',
+
+    # ── ORGANIZATION ──────────────────────────────────────────
+    '*affiliation':     'Organization',
+    '*partner':         'Organization',
+    '*funder':          'Organization',
+    '*maker':           'Organization',
+    '*owner':           'Organization',
+    '*enumerator':      'Organization',
+
+    # ── QUALITY / COMPLIANCE ──────────────────────────────────
+    '*certification':   'Compliance',
+    '*certifications':  'Compliance',
+
+    # ── PRODUCT ───────────────────────────────────────────────
+    '*product':         'Product',
+    '*products':        'Product',
+
+    # ── NOISE (excluded from analysis) ────────────────────────
+    '*nan':             '_noise',
+    '*delete':          '_noise',
+    '*bucket':          '_noise',
+
+    # ── CAPABILITIES (fabrication equipment types available) ──
+    'capabilities':     'FabricationCapability',
+    'cats':             'FabricationCapability',
+    '*capabilities':    'FabricationCapability',
+    '*cats':            'FabricationCapability',
 }
 
-# ==========================================
-# 2. CORE PIPELINE FUNCTIONS
-# ==========================================
-
 def extract_core_concept(column_name):
-    """Uses NLP to reduce a multi-word column name to its core noun."""
-    clean_name = str(column_name).lower().replace('_', ' ').replace('-', ' ')
-    
-    if len(clean_name.split()) == 1:
-        return clean_name
-        
-    doc = nlp(clean_name)
-    
+    # Normalize: lowercase, strip dot-suffix, trailing numbers, separators
+    clean = str(column_name).lower()
+    clean = clean.split('.')[0]                 # "openHours.Mo" → "openhours"
+    clean = re.sub(r'\d+$', '', clean)          # "photo3" → "photo"
+    clean = clean.replace('-', ' ').replace('_', ' ').strip()
+
+    if not clean:
+        return str(column_name).lower()
+    if len(clean.split()) == 1:
+        return clean
+
+    # Multi-word: extract core noun via NLP
+    doc = nlp(clean)
     for chunk in doc.noun_chunks:
         return chunk.root.text
-        
     nouns = [token.text for token in doc if token.pos_ in ['NOUN', 'PROPN']]
-    if nouns:
-        return nouns[-1] 
-        
-    return clean_name.split()[-1]
+    return nouns[-1] if nouns else clean.split()[-1]
 
-def get_schema_taxonomy(column_name):
+
+def get_schema_taxonomy(column_name, init_data):
     """Classifies a column name using the loaded Schema.org DataFrames."""
+
+    types_df = init_data['types_url']
+    props_df = init_data['props_url']
+
     clean_name = str(column_name).lower().replace('_', '').replace(' ', '')
     
-    # Check Properties
     prop_match = props_df[props_df['label'].str.lower() == clean_name]
     if not prop_match.empty:
         domain_raw = str(prop_match.iloc[0]['domainIncludes']).split(',')[0]
         return domain_raw.replace('https://schema.org/', '')
 
-    # Check Types
     type_match = types_df[types_df['label'].str.lower() == clean_name]
     if not type_match.empty:
         parent_raw = str(type_match.iloc[0]['subTypeOf']).split(',')[0]
@@ -634,32 +815,54 @@ def get_schema_taxonomy(column_name):
         
     return f"Unclassified: {column_name}"
 
-def get_taxonomy_for_pipeline(column_name):
-    """The master waterfall function that controls the logic flow."""
-    # 1. Reduce multi-word phrase to a single concept
-    core_concept = extract_core_concept(column_name)
-    
-    # 2. Check local dictionary
-    if core_concept in COMMON_SURVEY_FIELDS:
-        return COMMON_SURVEY_FIELDS[core_concept]
-        
-    # 3. Query Schema.org
-    return get_schema_taxonomy(core_concept)
+def get_taxonomy_for_pipeline(column_name, init_data):
+    # Normalize
+    clean = str(column_name).lower().split('.')[0]  # strip dot-notation suffix
+    clean = re.sub(r'\d+$', '', clean)              # strip trailing numbers
+    clean = clean.replace('-', '_').strip()
 
-# ==========================================
-# 3. VISUALIZATION FUNCTION
-# ==========================================
+    # 1. Exact full-name match
+    if clean in FIELD_TAXONOMY:
+        return FIELD_TAXONOMY[clean]
 
-if __name__ == "__functions__":
-    model_name = "en_core_web_sm"
-    if not is_package(model_name):
-        import spacy.cli
-        spacy.cli.download(model_name)
-    nlp = spacy.load(model_name)
+    # 2. NLP → core concept → prefixed lookup
+    core = extract_core_concept(clean)
+    prefixed = f'*{core}'
+    if prefixed in FIELD_TAXONOMY:
+        return FIELD_TAXONOMY[prefixed]
 
-    # Initialize Schema.org Offline Vocabulary
-    print("Loading Schema.org vocabulary into memory...")
-    TYPES_URL = "https://raw.githubusercontent.com/schemaorg/schemaorg/main/data/releases/29.4/schemaorg-current-https-types.csv"
-    PROPS_URL = "https://raw.githubusercontent.com/schemaorg/schemaorg/main/data/releases/29.4/schemaorg-current-https-properties.csv"
-    types_df = pd.read_csv(TYPES_URL)
-    props_df = pd.read_csv(PROPS_URL)
+    # 3. Schema.org fallback
+    return get_schema_taxonomy(core, init_data)
+
+
+def inspect_classification(init_data, dataframes, df_names=None):
+    """
+    Returns a readable breakdown of every column → class mapping,
+    grouped by class, for human review.
+    """
+    if df_names is None:
+        df_names = [f"DF {i+1}" for i in range(len(dataframes))]
+
+    full_map = {}
+    for name, df in zip(df_names, dataframes):
+        full_map[name] = {}
+        for col in df.columns:
+            tax = get_taxonomy_for_pipeline(col, init_data)
+            full_map[name][col] = tax
+
+    for source, mapping in full_map.items():
+        print(f"\n{'═'*50}")
+        print(f"  {source}")
+        print(f"{'═'*50}")
+
+        by_class = {}
+        for col, cls in mapping.items():
+            by_class.setdefault(cls, []).append(col)
+
+        for cls, cols in sorted(by_class.items()):
+            flag = " ⚠" if cls.startswith("Unclassified") or cls == "nan" else ""
+            print(f"  [{cls}]{flag}")
+            for col in cols:
+                print(f"      {col}")
+
+    return full_map
