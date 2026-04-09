@@ -786,9 +786,7 @@ def plot_category_bars(full_map):
     return fig
 
 def plot_category_heatmap(full_map):
-    """Heatmap of column count per category per source."""
 
-    # Collect all categories
     all_categories = sorted({
         cls
         for col_map in full_map.values()
@@ -796,7 +794,6 @@ def plot_category_heatmap(full_map):
         if cls != '_noise' and not str(cls).startswith('Review')
     })
 
-    # Build count matrix
     source_names = list(full_map.keys())
     matrix = pd.DataFrame(0, index=source_names, columns=all_categories)
 
@@ -805,21 +802,23 @@ def plot_category_heatmap(full_map):
             if cls == '_noise' or str(cls).startswith('Review'):
                 continue
             matrix.loc[source_name, cls] += 1
-            
 
-    # Plot
+    # ── Sort rows by total richness (descending) ──
+    matrix = matrix.loc[matrix.sum(axis=1).sort_values(ascending=False).index]
+
+    # ── Sort columns by total presence (descending) ──
+    matrix = matrix[matrix.sum(axis=0).sort_values(ascending=False).index]
+
     fig, ax = plt.subplots(figsize=(16, len(source_names) * 0.8 + 2))
     im = ax.imshow(matrix.values, aspect='auto', cmap='Blues')
 
-    # Axis labels
-    ax.set_xticks(range(len(all_categories)))
-    ax.set_xticklabels(all_categories, rotation=45, ha='right', fontsize=9)
-    ax.set_yticks(range(len(source_names)))
-    ax.set_yticklabels(source_names, fontsize=9)
+    ax.set_xticks(range(len(matrix.columns)))
+    ax.set_xticklabels(matrix.columns, rotation=45, ha='right', fontsize=9)
+    ax.set_yticks(range(len(matrix.index)))
+    ax.set_yticklabels(matrix.index, fontsize=9)
 
-    # Annotate cells
-    for i in range(len(source_names)):
-        for j in range(len(all_categories)):
+    for i in range(len(matrix.index)):
+        for j in range(len(matrix.columns)):
             val = matrix.iloc[i, j]
             if val > 0:
                 ax.text(j, i, str(val), ha='center', va='center',
@@ -831,4 +830,229 @@ def plot_category_heatmap(full_map):
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     plt.tight_layout()
+    return fig
+
+
+def create_bubble_density_plot(full_map, title="Bubble Density of Categories by Dataset"):
+    """
+    Parses a nested dictionary into a matrix, calculates data density (fill rate), 
+    and generates a 2.5D Bubble Heatmap figure.
+    """
+    # 1. Parse the nested dictionary into a DataFrame matrix (from your working example)
+    all_categories = sorted({
+        cls
+        for col_map in full_map.values()
+        for cls in col_map.values()
+        if cls != '_noise' and not str(cls).startswith('Review')
+    })
+
+    source_names = list(full_map.keys())
+    df = pd.DataFrame(0, index=source_names, columns=all_categories)
+
+    for source_name, col_map in full_map.items():
+        for cls in col_map.values():
+            if cls == '_noise' or str(cls).startswith('Review'):
+                continue
+            df.loc[source_name, cls] += 1
+
+    # Sort rows by total richness and columns by total presence 
+    df = df.loc[df.sum(axis=1).sort_values(ascending=False).index]
+    df = df[df.sum(axis=0).sort_values(ascending=False).index]
+
+    # 2. Calculate Source Fill Rate 
+    # (Percentage of categories this source has > 0 columns for)
+    source_fill_rate = (df > 0).mean(axis=1) * 100
+
+    # 3. Flatten (melt) the DataFrame for the Seaborn scatter plot
+    df_melted = df.reset_index().melt(
+        id_vars='index', 
+        var_name='Category', 
+        value_name='Count'
+    )
+    df_melted.rename(columns={'index': 'Source'}, inplace=True)
+
+    # Map the Source Fill Rate back to the flattened data
+    df_melted['Source_Fill_Rate'] = df_melted['Source'].map(source_fill_rate)
+
+    # Filter out zeros so we only plot actual populated intersections
+    df_plot = df_melted[df_melted['Count'] > 0]
+
+    # 4. Create the matplotlib figure
+    # Using dynamic height based on the number of sources (just like your heatmap)
+    fig, ax = plt.subplots(figsize=(16, len(source_names) * 0.8 + 2))
+    
+    # Handle edge case where matrix is completely empty
+    if df_plot.empty:
+        ax.text(0.5, 0.5, "No data to display after filtering.", ha='center', va='center')
+        return fig
+
+    sns.scatterplot(
+        data=df_plot, 
+        x='Category', 
+        y='Source', 
+        size='Count', 
+        hue='Source_Fill_Rate',
+        sizes=(50, 1000), # Adjust min/max bubble sizes here
+        palette="Blues", 
+        alpha=0.8,
+        edgecolor="black",
+        ax=ax
+    )
+
+    # 5. Formatting the plot
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=9)
+    ax.set_title(title, fontsize=13, pad=15)
+    
+    # Move legend out of the way
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0, title="Fill Rate (%) & Count")
+    
+    ax.grid(True, linestyle='--', alpha=0.3)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    fig.tight_layout()
+    return fig
+
+
+def heatmap_bubble_dri(full_map, title="DRI Taxonomy Coverage"):
+    """
+    Bubble heatmap for DRI taxonomy coverage.
+    Bubble size = column count, color = fill rate (% of DRI categories present).
+    Styled for research paper publication.
+    """
+    import matplotlib.pyplot as plt
+    import matplotlib.colors as mcolors
+    import matplotlib.cm as cm
+    import pandas as pd
+    import numpy as np
+
+    DRI_CATEGORIES = {
+        'Coordinates', 'Location', 'RegionalLocation',
+        'Organization', 'Identifier', 'Contact',
+        'Equipment', 'Product', 'ManufacturingProcess'
+    }
+
+    # ── Build matrix ─────────────────────────────────────────
+    source_names = list(full_map.keys())
+    existing = sorted({
+        cls for col_map in full_map.values()
+        for cls in col_map.values()
+        if cls in DRI_CATEGORIES
+    })
+
+    matrix = pd.DataFrame(0, index=source_names, columns=existing)
+    for source, col_map in full_map.items():
+        for cls in col_map.values():
+            if cls in DRI_CATEGORIES:
+                matrix.loc[source, cls] += 1
+
+    matrix = matrix.loc[(matrix > 0).any(axis=1)]
+    matrix = matrix.loc[matrix.sum(axis=1).sort_values(ascending=False).index]
+    matrix = matrix[matrix.sum(axis=0).sort_values(ascending=False).index]
+
+    fill_rate = (matrix > 0).mean(axis=1) * 100
+
+    df_melted = (
+        matrix.reset_index()
+              .melt(id_vars='index', var_name='Category', value_name='Count')
+              .rename(columns={'index': 'Source'})
+    )
+    df_melted['Fill_Rate'] = df_melted['Source'].map(fill_rate)
+    df_plot = df_melted[df_melted['Count'] > 0].copy()
+
+    # ── Layout ───────────────────────────────────────────────
+    n_sources = len(matrix.index)
+    n_cats    = len(matrix.columns)
+
+    fig, ax = plt.subplots(figsize=(n_cats * 1.2 + 2, n_sources * 0.65 + 2))
+
+    # ── Color map (fill rate) ─────────────────────────────────
+    cmap   = cm.YlGn
+    norm   = mcolors.Normalize(vmin=0, vmax=100)
+    colors = df_plot['Fill_Rate'].apply(lambda v: cmap(norm(v)))
+
+    # ── Bubble size scaling ───────────────────────────────────
+    max_count  = df_plot['Count'].max()
+    size_scale = df_plot['Count'].apply(lambda c: (c / max_count) * 900 + 80)
+
+    # ── Category and source as numeric positions ──────────────
+    cat_order    = list(matrix.columns)
+    source_order = list(matrix.index)
+
+    df_plot['x'] = df_plot['Category'].apply(lambda c: cat_order.index(c))
+    df_plot['y'] = df_plot['Source'].apply(lambda s: source_order.index(s))
+
+    scatter = ax.scatter(
+        df_plot['x'],
+        df_plot['y'],
+        s=size_scale,
+        c=df_plot['Fill_Rate'],
+        cmap=cmap,
+        norm=norm,
+        alpha=0.85,
+        edgecolors='#444444',
+        linewidths=0.4,
+    )
+
+    # ── Annotate count inside bubble ─────────────────────────
+    for _, row in df_plot.iterrows():
+        ax.text(
+            row['x'], row['y'], str(int(row['Count'])),
+            ha='center', va='center',
+            fontsize=7, fontweight='500',
+            color='white' if row['Fill_Rate'] > 55 else '#333333'
+        )
+
+    # ── Axes ─────────────────────────────────────────────────
+    ax.set_xticks(range(n_cats))
+    ax.set_xticklabels(cat_order, rotation=40, ha='right', fontsize=9,
+                       fontfamily='serif')
+    ax.set_yticks(range(n_sources))
+    ax.set_yticklabels(source_order, fontsize=9, fontfamily='serif')
+
+    ax.set_xlim(-0.6, n_cats - 0.4)
+    ax.set_ylim(-0.6, n_sources - 0.4)
+    ax.invert_yaxis()
+
+    ax.set_xlabel('Semantic category', fontsize=10, fontfamily='serif', labelpad=10)
+    ax.set_ylabel('Data source', fontsize=10, fontfamily='serif', labelpad=10)
+    ax.set_title(title, fontsize=12, fontfamily='serif', fontweight='bold', pad=14)
+
+    # ── Grid ─────────────────────────────────────────────────
+    ax.set_axisbelow(True)
+    ax.grid(True, linestyle=':', linewidth=0.5, color='#cccccc', alpha=0.8)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    # ── Colorbar (fill rate) ──────────────────────────────────
+    cbar = fig.colorbar(scatter, ax=ax, pad=0.02, fraction=0.025, aspect=30)
+    cbar.set_label('DRI fill rate (%)', fontsize=9, fontfamily='serif')
+    cbar.ax.tick_params(labelsize=8)
+    cbar.outline.set_visible(False)
+
+    # ── Bubble size legend ────────────────────────────────────
+    legend_counts = sorted(
+        [c for c in [1, 2, 4, max_count] if c <= max_count]
+    )
+    legend_handles = [
+        plt.scatter([], [], s=(c / max_count) * 900 + 80,
+                    color='#888888', alpha=0.7, edgecolors='#444444',
+                    linewidths=0.4, label=str(c))
+        for c in legend_counts
+    ]
+    legend = ax.legend(
+        handles=legend_handles,
+        title='Column\ncount',
+        title_fontsize=8,
+        fontsize=8,
+        loc='lower right',
+        frameon=True,
+        framealpha=0.9,
+        edgecolor='#cccccc',
+        labelspacing=1.0,
+        borderpad=0.8,
+    )
+    legend.get_frame().set_linewidth(0.5)
+
+    fig.tight_layout()
     return fig

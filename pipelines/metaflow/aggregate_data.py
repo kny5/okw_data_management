@@ -33,7 +33,7 @@ from __functions__ import (
     inject_secure_map_logic,
     generate_blake2_uid,
 )
-from __visualisations__ import Plot, Tabular, graph_dataframe_relationships, plot_semantic_dendrogram, plot_schema_network, plot_schema_network_2, plot_category_lines, plot_category_bars, plot_category_heatmap
+from __visualisations__ import Plot, Tabular, create_bubble_density_plot, graph_dataframe_relationships, heatmap_bubble_dri, plot_semantic_dendrogram, plot_schema_network, plot_schema_network_2, plot_category_lines, plot_category_bars, plot_category_heatmap
 from metaflow import Flow, FlowSpec, card, resources, step, Parameter, Runner, current
 from metaflow.cards import Markdown, Image
 LOAD_HTML = None
@@ -266,6 +266,16 @@ class JoinData01(FlowSpec):
         category_fig = plot_category_heatmap(full_map)
         current.card.append(Image.from_matplotlib(category_fig))
 
+        current.card.append(Markdown("# Bubble density of Categories by Dataset"))
+        category_fig_4 = create_bubble_density_plot(full_map, title="Bubble Density of Categories by Dataset")
+        current.card.append(Image.from_matplotlib(category_fig_4))
+
+        current.card.append(Markdown("---"))
+        current.card.append(Markdown("# DRI Taxonomy Focus"))
+        
+        dri_fig = heatmap_bubble_dri(full_map)
+        
+        current.card.append(Image.from_matplotlib(dri_fig))
 
         self.next(self.wrap_up)
 
