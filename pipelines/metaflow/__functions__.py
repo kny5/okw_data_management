@@ -591,51 +591,62 @@ def img_uri(img):
 FIELD_TAXONOMY = {
 
     # ── IDENTITY ──────────────────────────────────────────────
-    '*name':            'Identity',
-    '*title':           'Identity',
-    '*label':           'Identity',
-    '*kind':            'Identity',
+    '*name':            'Identifier',
+    '*title':           'Identifier',
+    '*label':           'Identifier',
+    '*kind':            'Identifier',
+    '*makery':          'Identifier',
+    '*parent':          'Identifier',
+    '*id':              'Identifier',
+    '*fid':             'Identifier',
+    '*uuid':            'Identifier',
+    '*uid':             'Identifier',
+    '*nsid':            'Identifier',
+    '*slug':            'Identifier',
+    '*ids':             'Identifier',
+    '*blurb':           'Identifier',
+    '*courte':          'Identifier',
 
-    # ── SYSTEM ────────────────────────────────────────────────
-    '*id':              'SystemField',
-    '*fid':             'SystemField',
-    '*uuid':            'SystemField',
-    '*uid':             'SystemField',
-    '*nsid':            'SystemField',
-    '*slug':            'SystemField',
-    '*sourcekey':       'SystemField',
-    '*delete':          'SystemField',
-    '*number':          'SystemField',
-    '*bucket':          'SystemField',
 
-    # ── TEMPORAL ──────────────────────────────────────────────
-    '*start':           'Temporal',
-    '*end':             'Temporal',
-    '*today':           'Temporal',
-    '*date':            'Temporal',
-    '*createdat':       'Temporal',
-    '*updatedat':       'Temporal',
-    '*year':            'Temporal',
-    '*founded':         'Temporal',
+    # ── COLLECTION METADATA ─────────────────────────────────────────────
+    '*updated':         'collectionMetadata',
+    '*created':         'collectionMetadata',
+    '*delete':          'collectionMetadata',
+    '*sourcekey':       'collectionMetadata',
+    '*createdat':       'collectionMetadata',
+    '*updatedat':       'collectionMetadata',
+    '*start':           'collectionMetadata',
+    '*end':             'collectionMetadata',
+    '*today':           'collectionMetadata',
+    '*date':            'collectionMetadata',
+    '*enumerator':      'collectionMetadata',
+    '*form':            'collectionMetadata',
 
-    # ── LOCATION ──────────────────────────────────────────────
-    '*country':         'Location',
-    '*governorate':     'Location',
-    '*address':         'Location',
-    '*street':          'Location',
-    '*fulladdress':     'Location',
-    '*village':         'Location',
-    '*district':        'Location',
-    '*county':          'Location',
+
+    # ── REGIONAL LOCATION ──────────────────────────────────────────────
+    '*country':         'RegionalLocation',
+    '*governorate':     'RegionalLocation',
+    '*village':         'RegionalLocation',
+    '*district':        'RegionalLocation',
+    '*county':          'RegionalLocation',
+    '*city':            'RegionalLocation',
+    '*state':           'RegionalLocation',
+    'county':           'RegionalLocation',
+    'subcounty':        'RegionalLocation',
+    'dbdistrict':       'RegionalLocation',
+
+    # Address LOCATION (non-regional, more specific)
     '*parish':          'Location',
     '*postcode':        'Location',
     '*zip':             'Location',
-    '*city':            'Location',
-    '*state':           'Location',
+    '*address':         'Location',
+    '*street':          'Location',
+    '*fulladdress':     'Location',
     '*code':            'Location',
     '*location':        'Location',
 
-    # ── COORDINATES ───────────────────────────────────────────
+
+    # ── COORDINATES (some times its a rounded position)
     '*latitude':        'Coordinates',
     '*longitude':       'Coordinates',
     '*lat':             'Coordinates',
@@ -649,6 +660,8 @@ FIELD_TAXONOMY = {
     '*telephone':       'Contact',
     '*email':           'Contact',
     '*contact':         'Contact',
+    '*subscriberemails': 'Contact',
+    '*jobtitle':        'Contact',
 
     # ── ONLINE PRESENCE ───────────────────────────────────────
     '*url':             'OnlinePresence',
@@ -665,16 +678,15 @@ FIELD_TAXONOMY = {
     '*social':          'OnlinePresence',
     '*fb':              'OnlinePresence',
     '*insta':           'OnlinePresence',
+    '*links':           'OnlinePresence',
 
     # ── DESCRIPTION ───────────────────────────────────────────
     '*description':     'Description',
     '*intro':           'Description',
-    '*blurb':           'Description',
     '*desc':            'Description',
     '*bio':             'Description',
     '*text':            'Description',
-    '*background':      'Description',
-
+    
     # ── MEDIA ─────────────────────────────────────────────────
     '*image':           'Media',
     '*images':          'Media',
@@ -685,12 +697,7 @@ FIELD_TAXONOMY = {
     '*icon':            'Media',
     '*film':            'Media',
     '*video':           'Media',
-
-    # ── CLASSIFICATION ────────────────────────────────────────
-    '*type':            'Classification',
-    '*category':        'Classification',
-    '*categories':      'Classification',
-    '*kind':            'Classification',
+    '*background':      'Media',
 
     # ── OPERATIONAL STATUS ────────────────────────────────────
     '*status':          'OperationalStatus',
@@ -705,21 +712,31 @@ FIELD_TAXONOMY = {
     '*surface':         'FacilityMetrics',
     '*size':            'FacilityMetrics',
     '*floor':           'FacilityMetrics',
+    '*there':           'FacilityMetrics',
+    '*number':          'FacilityMetrics',
+    '*year':            'FacilityMetrics',
+    '*founded':         'FacilityMetrics',
+    '*with':            'FacilityMetrics',
+    '*count':           'FacilityMetrics',
+
 
     # ── OPERATING SCHEDULE ────────────────────────────────────
     '*hours':           'Schedule',
     '*openhours':       'Schedule',
     '*days':            'Schedule',
     '*schedule':        'Schedule',
+    '*time':            'Schedule',
+    '*turnaround':      'Schedule',
 
     # ── MANUFACTURING PROCESS ─────────────────────────────────
     '*process':         'ManufacturingProcess',
     '*production':      'ManufacturingProcess',
     '*run':             'ManufacturingProcess',
     '*batch':           'ManufacturingProcess',
-    '*turnaround':      'ManufacturingProcess',
     '*sample':          'ManufacturingProcess',
     '*order':           'ManufacturingProcess',
+    '*types':           'ManufacturingProcess',
+    '*processes':        'ManufacturingProcess',
 
     # ── EQUIPMENT ─────────────────────────────────────────────
     '*equipment':       'Equipment',
@@ -731,6 +748,9 @@ FIELD_TAXONOMY = {
     '*supply':          'Equipment',
     '*model':           'Equipment',
     '*serial':          'Equipment',
+    '*maker':           'Equipment',
+    '*machines':        'Equipment',
+    '*ups':             'Equipment',
 
     # ── MATERIALS ─────────────────────────────────────────────
     '*material':        'Material',
@@ -741,6 +761,8 @@ FIELD_TAXONOMY = {
     '*elastomer':       'Material',
     '*ceramics':        'Material',
     '*electronics':     'Material',
+    '*others':          'Material',
+    '*m_id':            'Material',
 
     # ── FACILITY ACCESS ───────────────────────────────────────
     '*access':          'FacilityAccess',
@@ -751,9 +773,8 @@ FIELD_TAXONOMY = {
     '*affiliation':     'Organization',
     '*partner':         'Organization',
     '*funder':          'Organization',
-    '*maker':           'Organization',
     '*owner':           'Organization',
-    '*enumerator':      'Organization',
+    '*gestion':         'Organization',
 
     # ── QUALITY / COMPLIANCE ──────────────────────────────────
     '*certification':   'Compliance',
@@ -765,34 +786,71 @@ FIELD_TAXONOMY = {
 
     # ── NOISE (excluded from analysis) ────────────────────────
     '*nan':             '_noise',
-    '*delete':          '_noise',
     '*bucket':          '_noise',
+    'aai':              '_noise',
+    'icm':              '_noise',
+    '*at':              '_noise',
+    '*d':               '_noise',
+    '*i':               '_noise',
+    '*nan':             '_noise',
+    '*nr':              '_noise',
 
     # ── CAPABILITIES (fabrication equipment types available) ──
     'capabilities':     'FabricationCapability',
     'cats':             'FabricationCapability',
     '*capabilities':    'FabricationCapability',
     '*cats':            'FabricationCapability',
+    '*type':            'FabricationCapability',
+    '*category':        'FabricationCapability',
+    '*categories':      'FabricationCapability',
+    '*kind':            'FabricationCapability',
+    '*categoriesfull':  'FabricationCapability',
 }
 
+COUNTRY_SUFFIXES = ['ke', 'us', 'fr', 'de', 'in', 'cn', 'jp', 'br', 'ru', 'za']
+ACRONYM_MIN_LENGTH = 3  # anything <= 2 chars with no match → Review
+
 def extract_core_concept(column_name):
-    # Normalize: lowercase, strip dot-suffix, trailing numbers, separators
     clean = str(column_name).lower()
-    clean = clean.split('.')[0]                 # "openHours.Mo" → "openhours"
-    clean = re.sub(r'\d+$', '', clean)          # "photo3" → "photo"
+    clean = clean.split('.')[0]                  # "openHours.Mo" → "openhours"
+    clean = re.sub(r'\d+$', '', clean)           # "photo3" → "photo"
+
+    # Strip country suffixes: "countyKE" → "county"
+    parts = clean.split('_')
+    if len(parts) > 1 and parts[-1] in COUNTRY_SUFFIXES:
+        parts = parts[:-1]
+    clean = '_'.join(parts)
+
     clean = clean.replace('-', ' ').replace('_', ' ').strip()
 
     if not clean:
         return str(column_name).lower()
+
+    # Single word — return as-is, no NLP, no transformation
+    # This preserves acronyms (icm, aai) and short names (id, fb)
     if len(clean.split()) == 1:
         return clean
 
     # Multi-word: extract core noun via NLP
+    # But only if the result is not shorter than the shortest input word
+    # This prevents "size floor size" → "size" replacing a meaningful compound
+    shortest_word = min(len(w) for w in clean.split())
     doc = nlp(clean)
+
     for chunk in doc.noun_chunks:
-        return chunk.root.text
+        root = chunk.root.text
+        if len(root) >= max(shortest_word, 3):
+            return root
+
     nouns = [token.text for token in doc if token.pos_ in ['NOUN', 'PROPN']]
-    return nouns[-1] if nouns else clean.split()[-1]
+    if nouns:
+        candidate = nouns[-1]
+        if len(candidate) >= max(shortest_word, 3):
+            return candidate
+
+    # NLP produced something too short or meaningless — return last meaningful word
+    words = [w for w in clean.split() if len(w) >= 3]
+    return words[-1] if words else clean.split()[-1]
 
 
 def get_schema_taxonomy(column_name, init_data):
@@ -835,18 +893,15 @@ def get_taxonomy_for_pipeline(column_name, init_data):
     return get_schema_taxonomy(core, init_data)
 
 
-def inspect_classification(init_data, dataframes, df_names=None):
+def inspect_classification(init_data, dataset):
     """
     Returns a readable breakdown of every column → class mapping,
     grouped by class, for human review.
     """
-    if df_names is None:
-        df_names = [f"DF {i+1}" for i in range(len(dataframes))]
-
     full_map = {}
-    for name, df in zip(df_names, dataframes):
+    for name, df in dataset.items():
         full_map[name] = {}
-        for col in df.columns:
+        for col in df['data_input'].columns:
             tax = get_taxonomy_for_pipeline(col, init_data)
             full_map[name][col] = tax
 

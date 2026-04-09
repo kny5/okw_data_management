@@ -32,6 +32,7 @@ import itertools
 import matplotlib.pyplot as plt
 import base64
 import io
+import networkx as nx
 
 import pandas as pd
 import seaborn as sns
@@ -167,6 +168,10 @@ class Plot:
     def add_points(self):
         """Adds points to the map using FastMarkerCluster for efficient rendering of large datasets,
         with custom cluster icons and callbacks defined in external JavaScript files."""
+        self.output_map['latitude']  = pd.to_numeric(self.output_map['latitude'],  errors='coerce')
+        self.output_map['longitude'] = pd.to_numeric(self.output_map['longitude'], errors='coerce')
+        self.output_map = self.output_map.dropna(subset=['latitude', 'longitude'])
+
 
         FastMarkerCluster(
             data=self.zip_data,
@@ -429,15 +434,15 @@ def generate_sparsity_plots(source_list, labels=None):
 
 
 
-def graph_dataframe_relationships(dataframes, data_init, df_names=None):
-    n = len(dataframes)
-    if df_names is None:
-        df_names = [f"DF {i+1}" for i in range(n)]
-
+def graph_dataframe_relationships(dataset, data_init):
+    print("^"*50)
+    print(type(dataset))
+    print(dataset.keys())
+    # breakpoint()
     dataset_contents = {}
-    for name, df in zip(df_names, dataframes):
+    for name, df in dataset.items():
         classified = set()
-        for col in df.columns:
+        for col in df['data_input']:
             tax = get_taxonomy_for_pipeline(col, data_init)
             # Drop noise and unclassified — they corrupt similarity scores
             if not tax.startswith('Unclassified') and tax != '_noise':
@@ -447,10 +452,10 @@ def graph_dataframe_relationships(dataframes, data_init, df_names=None):
     print("\nTaxonomy Mapping Complete. Generating Heatmap...")
 
     # 2. Build the Co-occurrence Matrix
-    matrix = pd.DataFrame(index=df_names, columns=df_names, dtype=int)
+    matrix = pd.DataFrame(index=dataset_contents.keys(), columns=dataset_contents.keys(), dtype=int)
     
-    for name1 in df_names:
-        for name2 in df_names:
+    for name1 in dataset_contents.keys():
+        for name2 in dataset_contents.keys():
             # Count how many semantic concepts these two dataframes share
             overlap = len(dataset_contents[name1].intersection(dataset_contents[name2]))
             matrix.loc[name1, name2] = overlap
@@ -470,7 +475,7 @@ def graph_dataframe_relationships(dataframes, data_init, df_names=None):
         cbar_kws={'label': 'Number of Shared Semantic Classes'}
     )
     
-    plt.title("Semantic Intersection Between DataFrames", fontsize=16, pad=20)
+    plt.title("Semantic Intersection Between Sources", fontsize=16, pad=20)
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
     buffer = io.BytesIO()
@@ -528,7 +533,7 @@ def plot_semantic_dendrogram(dataset_contents):
         color_threshold=0.3 * max(linked[:, 2]) 
     )
     
-    plt.title("Hierarchical Clustering of DataFrames", fontsize=16, pad=20)
+    plt.title("Hierarchical Clustering of Sources", fontsize=16, pad=20)
     plt.xlabel("Data Sources", fontsize=14, labelpad=15)
     plt.ylabel("Jaccard Distance", fontsize=12)
     plt.xticks(rotation=45, ha='right')
@@ -541,4 +546,289 @@ def plot_semantic_dendrogram(dataset_contents):
     fig.savefig("semantic_dendrogram.png", dpi=300, bbox_inches='tight')
     
     plt.close(fig)
+    return fig
+
+
+def plot_schema_network(dataset, data_init):
+    """
+    Creates a force-directed network graph linking 
+    Sources -> Original Columns -> Semantic Categories.
+    """
+    print("Building schema network graph...")
+    
+    # Initialize an undirected graph
+    G = nx.Graph()
+    
+    # Track node types so we can color-code them later
+    sources = set()
+    columns = set()
+    categories = set()
+    
+    for name, df in dataset.items():
+        sources.add(name)
+        G.add_node(name, type='source')
+        
+        for col in df['data_input'].columns.tolist():
+            # Classify the column using your existing pipeline function
+            # Ensure get_taxonomy_for_pipeline is imported/available in this scope
+            category = get_taxonomy_for_pipeline(col, data_init)
+            
+            columns.add(col)
+            categories.add(category)
+            
+            # Add nodes
+            G.add_node(col, type='column')
+            G.add_node(category, type='category')
+            
+            # Add edges linking them together
+            G.add_edge(name, col)      # Connect Source to its Column
+            G.add_edge(col, category)  # Connect Column to its Schema Category
+            
+    print(f"Network built: {len(G.nodes)} nodes and {len(G.edges)} edges.")
+    
+    # Render the graph
+    fig = plt.figure(figsize=(18, 14))
+    
+    # spring_layout uses a force-directed algorithm to push apart unrelated nodes 
+    # and pull together highly connected ones. (k controls the distance between nodes)
+    pos = nx.spring_layout(G, k=0.3, iterations=50)
+    
+    # Draw Nodes by type with distinct colors and sizes
+    nx.draw_networkx_nodes(G, pos, nodelist=list(sources), 
+                           node_color='#ff9999', node_size=1200, label='Data Sources')
+    
+    nx.draw_networkx_nodes(G, pos, nodelist=list(categories), 
+                           node_color='#99ff99', node_size=800, label='Semantic Categories')
+    
+    nx.draw_networkx_nodes(G, pos, nodelist=list(columns), 
+                           node_color='#99ccff', node_size=300, label='Original Columns')
+    
+    # Draw Edges (make them light grey so they don't overpower the text)
+    nx.draw_networkx_edges(G, pos, alpha=0.15, edge_color='gray')
+    
+    # Draw Labels (Column names, Source names, etc.)
+    nx.draw_networkx_labels(G, pos, font_size=8, font_family='sans-serif')
+    
+    plt.title("Data Schema Relationship Network", fontsize=20, pad=20)
+    
+    # Add a legend
+    plt.legend(scatterpoints=1, loc='upper right', fontsize=12)
+    plt.axis('off') # Hide the standard x/y graph box
+    
+    plt.tight_layout()
+    
+    # Close the figure background to save memory and return the object
+    plt.close(fig)
+    return fig
+    
+
+
+def plot_schema_network_2(dataset_contents, exclude_classes=None):
+    exclude_classes = exclude_classes or {'_noise', 'SystemField', 'OnlinePresence', 'Coordinates'}
+    
+    G = nx.Graph()
+    
+    for source, col_map in dataset_contents.items():
+        G.add_node(source, kind='source')
+        for col, cls in col_map.items():
+            if cls in exclude_classes or cls.startswith('Review'):
+                continue
+            G.add_node(cls, kind='category')
+            G.add_node(col, kind='column')
+            G.add_edge(source, cls)
+            G.add_edge(cls, col)
+    
+    # Remove categories connected to only one source (not interesting for comparison)
+    categories_to_remove = [
+        n for n, d in G.nodes(data=True)
+        if d.get('kind') == 'category' and
+        sum(1 for nb in G.neighbors(n) 
+            if G.nodes[nb].get('kind') == 'source') < 2
+    ]
+    G.remove_nodes_from(categories_to_remove)
+    # Also remove orphaned columns
+    G.remove_nodes_from([n for n in G.nodes() if G.degree(n) == 0])
+    
+    pos = nx.kamada_kawai_layout(G)
+    
+    color_map = {
+        'source':   '#E05C5C',
+        'category': '#5CBE6E',
+        'column':   '#7BAFD4',
+    }
+    size_map = {
+        'source':   800,
+        'category': 400,
+        'column':   80,       # much smaller — de-emphasize
+    }
+    
+    colors = [color_map[G.nodes[n]['kind']] for n in G.nodes()]
+    sizes  = [size_map[G.nodes[n]['kind']] for n in G.nodes()]
+    
+    fig, ax = plt.subplots(figsize=(16, 12))
+    nx.draw_networkx(
+        G, pos,
+        node_color=colors,
+        node_size=sizes,
+        font_size=7,
+        edge_color='#cccccc',
+        width=0.5,
+        ax=ax
+    )
+    # Only label sources and categories — suppress column labels
+    source_cat_labels = {
+        n: n for n, d in G.nodes(data=True)
+        if d['kind'] in ('source', 'category')
+    }
+    nx.draw_networkx_labels(G, pos, labels=source_cat_labels, font_size=9, ax=ax)
+    
+    plt.title("Schema Category Network (shared categories only)", fontsize=14)
+    plt.axis('off')
+    plt.tight_layout()
+    return fig
+
+
+def plot_category_lines(full_map):
+    """Line plot of column count per category, one line per source."""
+
+    # Collect all categories across all sources (excluding noise/review)
+    all_categories = sorted({
+        cls
+        for col_map in full_map.values()
+        for cls in col_map.values()
+        if cls != '_noise' and not str(cls).startswith('Review')
+    })
+
+    # Build count matrix: source → {category: count}
+    source_counts = {}
+    for source_name, col_map in full_map.items():
+        counter = {}
+        for cls in col_map.values():
+            if cls == '_noise' or str(cls).startswith('Review'):
+                continue
+            counter[cls] = counter.get(cls, 0) + 1
+        source_counts[source_name] = counter
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(14, 6))
+    x = np.arange(len(all_categories))
+    colors = plt.cm.tab10.colors
+    
+    for i, (source_name, counter) in enumerate(source_counts.items()):
+        y = [counter.get(cat, 0) for cat in all_categories]
+        if source_name == 'Source_02':
+            lw = 5
+        else:
+            lw = 1.5
+        ax.plot(x, y, marker='o', linewidth=lw, markersize=4,
+                label=source_name, color=colors[i % len(colors)])
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(all_categories, rotation=45, ha='right', fontsize=9)
+    ax.set_ylabel('Number of columns', fontsize=11)
+    ax.set_title('Category column count per source', fontsize=13)
+    ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left', fontsize=9)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.5)
+    ax.set_axisbelow(True)
+
+    plt.tight_layout()
+    return fig
+
+def plot_category_bars(full_map):
+    """Grouped bar chart of column count per category, one group per category."""
+    # Collect all categories across all sources
+    all_categories = sorted({
+        cls
+        for col_map in full_map.values()
+        for cls in col_map.values()
+        if cls != '_noise' and not str(cls).startswith('Review')
+    })
+
+    # Build count matrix
+    source_names = list(full_map.keys())
+    source_counts = {}
+    for source_name, col_map in full_map.items():
+        counter = {}
+        for cls in col_map.values():
+            if cls == '_noise' or str(cls).startswith('Review'):
+                continue
+            counter[cls] = counter.get(cls, 0) + 1
+        source_counts[source_name] = counter
+
+    # Layout
+    x = np.arange(len(all_categories))
+    n_sources = len(source_names)
+    bar_width = 0.8 / n_sources
+    colors = plt.cm.tab10.colors
+
+    fig, ax = plt.subplots(figsize=(16, 6))
+
+    for i, source_name in enumerate(source_names):
+        counter = source_counts[source_name]
+        y = [counter.get(cat, 0) for cat in all_categories]
+        offset = (i - n_sources / 2 + 0.5) * bar_width
+        ax.bar(x + offset, y, width=bar_width, label=source_name,
+               color=colors[i % len(colors)], edgecolor='white')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(all_categories, rotation=45, ha='right', fontsize=9)
+    ax.set_ylabel('Number of columns', fontsize=11)
+    ax.set_title('Category column count per source', fontsize=13)
+    ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left', fontsize=9)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.5)
+    ax.set_axisbelow(True)
+
+    plt.tight_layout()
+    return fig
+
+def plot_category_heatmap(full_map):
+    """Heatmap of column count per category per source."""
+
+    # Collect all categories
+    all_categories = sorted({
+        cls
+        for col_map in full_map.values()
+        for cls in col_map.values()
+        if cls != '_noise' and not str(cls).startswith('Review')
+    })
+
+    # Build count matrix
+    source_names = list(full_map.keys())
+    matrix = pd.DataFrame(0, index=source_names, columns=all_categories)
+
+    for source_name, col_map in full_map.items():
+        for cls in col_map.values():
+            if cls == '_noise' or str(cls).startswith('Review'):
+                continue
+            matrix.loc[source_name, cls] += 1
+            
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(16, len(source_names) * 0.8 + 2))
+    im = ax.imshow(matrix.values, aspect='auto', cmap='Blues')
+
+    # Axis labels
+    ax.set_xticks(range(len(all_categories)))
+    ax.set_xticklabels(all_categories, rotation=45, ha='right', fontsize=9)
+    ax.set_yticks(range(len(source_names)))
+    ax.set_yticklabels(source_names, fontsize=9)
+
+    # Annotate cells
+    for i in range(len(source_names)):
+        for j in range(len(all_categories)):
+            val = matrix.iloc[i, j]
+            if val > 0:
+                ax.text(j, i, str(val), ha='center', va='center',
+                        fontsize=8,
+                        color='white' if val > matrix.values.max() * 0.6 else 'black')
+
+    plt.colorbar(im, ax=ax, label='Number of columns')
+    ax.set_title('Category column count per source', fontsize=13)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    plt.tight_layout()
     return fig

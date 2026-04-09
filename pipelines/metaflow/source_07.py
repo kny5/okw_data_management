@@ -29,6 +29,7 @@ class Source_07(FlowSpec, TailSteps):
         print("Starting...")
         self.next(self.extract)
 
+    @card
     @step
     def extract(self):
         html_parser = [
@@ -39,6 +40,7 @@ class Source_07(FlowSpec, TailSteps):
         data = '[{"' + re.findall(r'\[{"(.*?)"\}\]\,', html_parser)[0] + '"}]'
         self.raw = json.loads(data)
         self.data_input = pd.DataFrame(self.raw)
+        self.cols = self.data_input.columns.tolist()
         print(self.data_input.columns.tolist())
         self.next(self.clean)
 
