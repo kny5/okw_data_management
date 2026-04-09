@@ -13,47 +13,42 @@ from __metasteps__ import TailSteps
 import requests
 from bs4 import BeautifulSoup
 import concurrent.futures
-from collections import defaultdict
-import ast
 
 FABLABS_BASE = "https://fablabs.io"
 
 
-
 def get_lab_machine_ids(lab_slug):
     machine_ids = []
-    
+
     # 1. Target the main lab profile page, not a /machines endpoint
     url = f"https://www.fablabs.io/labs/{lab_slug}"
-    
+
     # 2. Add a standard User-Agent header to prevent 403 blocks
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
     try:
         r = requests.get(url, headers=headers, timeout=10)
-        
+
         if r.status_code == 200:
-            soup = BeautifulSoup(r.content, 'html.parser')
-            
+            soup = BeautifulSoup(r.content, "html.parser")
+
             # 3. Target the 'machine' class directly for a more robust scrape
-            machine_divs = soup.find_all('div', class_='machine')
-            
+            machine_divs = soup.find_all("div", class_="machine")
+
             for div in machine_divs:
-                div_id = div.get('id')
-                if div_id and div_id.startswith('machine_'):
+                div_id = div.get("id")
+                if div_id and div_id.startswith("machine_"):
                     # Strip the prefix and append
-                    machine_ids.append(div_id.replace('machine_', ''))
+                    machine_ids.append(div_id.replace("machine_", ""))
         else:
             print(f"Failed to fetch {lab_slug} - Status Code: {r.status_code}")
-            
+
     except Exception as e:
         print(f"Error fetching {lab_slug}: {e}")
 
     return list(set(machine_ids))
-
-
 
 
 class Source_02(FlowSpec, TailSteps):
@@ -79,39 +74,40 @@ class Source_02(FlowSpec, TailSteps):
     @step
     def enrich(self):
         """Fetches machine IDs for each lab using concurrent workers and merges onto data_output."""
+
         def get_lab_machine_ids(lab_slug):
             machine_ids = []
             url = f"https://www.fablabs.io/labs/{lab_slug}"
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
 
             try:
                 r = requests.get(url, headers=headers, timeout=10)
                 if r.status_code == 200:
-                    soup = BeautifulSoup(r.content, 'html.parser')
-                    machine_divs = soup.find_all('div', class_='machine')
-                    
+                    soup = BeautifulSoup(r.content, "html.parser")
+                    machine_divs = soup.find_all("div", class_="machine")
+
                     for div in machine_divs:
-                        div_id = div.get('id')
-                        if div_id and div_id.startswith('machine_'):
-                            machine_ids.append(div_id.replace('machine_', ''))
+                        div_id = div.get("id")
+                        if div_id and div_id.startswith("machine_"):
+                            machine_ids.append(div_id.replace("machine_", ""))
             except Exception:
-                pass # Silently fail here, error handling/logging is done in the ThreadPool loop
-                
+                pass  # Silently fail here, error handling/logging is done in the ThreadPool loop
+
             return list(set(machine_ids))
 
         results_dict = {}
-        max_workers = 40 # Adjust this number to increase/decrease simultaneous workers
-        
+        max_workers = 40  # Adjust this number to increase/decrease simultaneous workers
+
         print(f"Starting concurrent machine fetching with {max_workers} workers...")
 
         # Create a thread pool to process multiple URLs at the same time
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all lab slugs to the thread pool
             future_to_slug = {
-                executor.submit(get_lab_machine_ids, slug): slug 
-                for slug in self.data_input['slug'].dropna()
+                executor.submit(get_lab_machine_ids, slug): slug
+                for slug in self.data_input["slug"].dropna()
             }
 
             # As each worker finishes fetching a lab's page, process the result
@@ -120,26 +116,34 @@ class Source_02(FlowSpec, TailSteps):
                 try:
                     ids = future.result()
                     results_dict[slug] = ids
-                    
+
                     # Print the parsed machines to stdout
-                    parsed_machines = ', '.join(ids) if ids else "None"
+                    parsed_machines = ", ".join(ids) if ids else "None"
                     print(f"[{slug}] Found {len(ids)} machines: {parsed_machines}")
-                    
+
                 except Exception as exc:
                     print(f"[{slug}] generated an exception: {exc}")
                     results_dict[slug] = []
 
         # Map the dictionary results back to the Pandas DataFrame
         # This is significantly faster and cleaner than row-by-row iteration
-        self.data_input['machines'] = self.data_input['slug'].map(results_dict).apply(lambda x: x if isinstance(x, list) else [])
-        self.data_input['machine_count'] = self.data_input['machines'].apply(len)
+        self.data_input["machines"] = (
+            self.data_input["slug"]
+            .map(results_dict)
+            .apply(lambda x: x if isinstance(x, list) else [])
+        )
+        self.data_input["machine_count"] = self.data_input["machines"].apply(len)
 
-        print(f"Done. {self.data_input['machine_count'].sum()} machines found across {len(self.data_input)} labs.")
+        print(
+            f"Done. {self.data_input['machine_count'].sum()} machines found across {len(self.data_input)} labs."
+        )
         self.next(self.clean)
 
     @step
     def clean(self):
-        remove_notactive = self.data_input[~self.data_input["activity_status"].isin(["closed", "planned"])]
+        remove_notactive = self.data_input[
+            ~self.data_input["activity_status"].isin(["closed", "planned"])
+        ]
 
         self.cleaned = remove_notactive.drop_duplicates(subset=["name"], keep="last")
         self.next(self.transform)
@@ -164,7 +168,6 @@ class Source_02(FlowSpec, TailSteps):
         self.data_output["source"] = id
         self.next(self.visualise)
 
-    
 
 if __name__ == "__main__":
     Source_02()

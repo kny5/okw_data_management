@@ -11,7 +11,6 @@ import unicodedata
 from time import sleep
 from hashlib import blake2b
 import base64
-import time
 
 import numpy as np
 import pandas as pd
@@ -28,7 +27,6 @@ import math
 _original_to_rgba = mcolors.to_rgba
 
 
-
 MODEL = "en_core_web_sm"
 if not is_package(MODEL):
     spacy.cli.download(MODEL)
@@ -40,13 +38,15 @@ def _safe_to_rgba(c, alpha=None):
     try:
         # If upsetplot passes 'NaN', convert it to a transparent RGBA tuple
         if isinstance(c, float) and math.isnan(c):
-            return (0.0, 0.0, 0.0, 0.0) 
+            return (0.0, 0.0, 0.0, 0.0)
     except Exception:
         pass
     return _original_to_rgba(c, alpha)
 
+
 # Override the strict parser with our safe one
 mcolors.to_rgba = _safe_to_rgba
+
 
 def retry_on_exception(max_retries=3, backoff_factor=1):
     """
@@ -589,239 +589,212 @@ def img_uri(img):
 
 # Your complete domain taxonomy — no Schema.org dependency
 FIELD_TAXONOMY = {
-
     # ── IDENTITY ──────────────────────────────────────────────
-    '*name':            'Identifier',
-    '*title':           'Identifier',
-    '*label':           'Identifier',
-    '*kind':            'Identifier',
-    '*makery':          'Identifier',
-    '*parent':          'Identifier',
-    '*id':              'Identifier',
-    '*fid':             'Identifier',
-    '*uuid':            'Identifier',
-    '*uid':             'Identifier',
-    '*nsid':            'Identifier',
-    '*slug':            'Identifier',
-    '*ids':             'Identifier',
-    '*blurb':           'Identifier',
-    '*courte':          'Identifier',
-
-
+    "*name": "Identifier",
+    "*title": "Identifier",
+    "*label": "Identifier",
+    "*makery": "Identifier",
+    "*parent": "Identifier",
+    "*id": "Identifier",
+    "*fid": "Identifier",
+    "*uuid": "Identifier",
+    "*uid": "Identifier",
+    "*nsid": "Identifier",
+    "*slug": "Identifier",
+    "*ids": "Identifier",
+    "*blurb": "Identifier",
+    "*courte": "Identifier",
     # ── COLLECTION METADATA ─────────────────────────────────────────────
-    '*updated':         'collectionMetadata',
-    '*created':         'collectionMetadata',
-    '*delete':          'collectionMetadata',
-    '*sourcekey':       'collectionMetadata',
-    '*createdat':       'collectionMetadata',
-    '*updatedat':       'collectionMetadata',
-    '*start':           'collectionMetadata',
-    '*end':             'collectionMetadata',
-    '*today':           'collectionMetadata',
-    '*date':            'collectionMetadata',
-    '*enumerator':      'collectionMetadata',
-    '*form':            'collectionMetadata',
-
-
+    "*updated": "collectionMetadata",
+    "*created": "collectionMetadata",
+    "*delete": "collectionMetadata",
+    "*sourcekey": "collectionMetadata",
+    "*createdat": "collectionMetadata",
+    "*updatedat": "collectionMetadata",
+    "*start": "collectionMetadata",
+    "*end": "collectionMetadata",
+    "*today": "collectionMetadata",
+    "*date": "collectionMetadata",
+    "*enumerator": "collectionMetadata",
+    "*form": "collectionMetadata",
     # ── REGIONAL LOCATION ──────────────────────────────────────────────
-    '*country':         'RegionalLocation',
-    '*governorate':     'RegionalLocation',
-    '*village':         'RegionalLocation',
-    '*district':        'RegionalLocation',
-    '*county':          'RegionalLocation',
-    '*city':            'RegionalLocation',
-    '*state':           'RegionalLocation',
-    'county':           'RegionalLocation',
-    'subcounty':        'RegionalLocation',
-    'dbdistrict':       'RegionalLocation',
-
+    "*country": "RegionalLocation",
+    "*governorate": "RegionalLocation",
+    "*village": "RegionalLocation",
+    "*district": "RegionalLocation",
+    "*county": "RegionalLocation",
+    "*city": "RegionalLocation",
+    "*state": "RegionalLocation",
+    "county": "RegionalLocation",
+    "subcounty": "RegionalLocation",
+    "dbdistrict": "RegionalLocation",
     # Address LOCATION (non-regional, more specific)
-    '*parish':          'Location',
-    '*postcode':        'Location',
-    '*zip':             'Location',
-    '*address':         'Location',
-    '*street':          'Location',
-    '*fulladdress':     'Location',
-    '*code':            'Location',
-    '*location':        'Location',
-
-
+    "*parish": "Location",
+    "*postcode": "Location",
+    "*zip": "Location",
+    "*address": "Location",
+    "*street": "Location",
+    "*fulladdress": "Location",
+    "*code": "Location",
+    "*location": "Location",
     # ── COORDINATES (some times its a rounded position)
-    '*latitude':        'Coordinates',
-    '*longitude':       'Coordinates',
-    '*lat':             'Coordinates',
-    '*long':            'Coordinates',
-    '*lng':             'Coordinates',
-    '*altitude':        'Coordinates',
-    '*accuracy':        'Coordinates',
-
+    "*latitude": "Coordinates",
+    "*longitude": "Coordinates",
+    "*lat": "Coordinates",
+    "*long": "Coordinates",
+    "*lng": "Coordinates",
+    "*altitude": "Coordinates",
+    "*accuracy": "Coordinates",
     # ── CONTACT ───────────────────────────────────────────────
-    '*phone':           'Contact',
-    '*telephone':       'Contact',
-    '*email':           'Contact',
-    '*contact':         'Contact',
-    '*subscriberemails': 'Contact',
-    '*jobtitle':        'Contact',
-
+    "*phone": "Contact",
+    "*telephone": "Contact",
+    "*email": "Contact",
+    "*contact": "Contact",
+    "*subscriberemails": "Contact",
+    "*jobtitle": "Contact",
     # ── ONLINE PRESENCE ───────────────────────────────────────
-    '*url':             'OnlinePresence',
-    '*link':            'OnlinePresence',
-    '*website':         'OnlinePresence',
-    '*web':             'OnlinePresence',
-    '*twitter':         'OnlinePresence',
-    '*facebook':        'OnlinePresence',
-    '*instagram':       'OnlinePresence',
-    '*linkedin':        'OnlinePresence',
-    '*youtube':         'OnlinePresence',
-    '*flickr':          'OnlinePresence',
-    '*pinterest':       'OnlinePresence',
-    '*social':          'OnlinePresence',
-    '*fb':              'OnlinePresence',
-    '*insta':           'OnlinePresence',
-    '*links':           'OnlinePresence',
-
+    "*url": "OnlinePresence",
+    "*link": "OnlinePresence",
+    "*website": "OnlinePresence",
+    "*web": "OnlinePresence",
+    "*twitter": "OnlinePresence",
+    "*facebook": "OnlinePresence",
+    "*instagram": "OnlinePresence",
+    "*linkedin": "OnlinePresence",
+    "*youtube": "OnlinePresence",
+    "*flickr": "OnlinePresence",
+    "*pinterest": "OnlinePresence",
+    "*social": "OnlinePresence",
+    "*fb": "OnlinePresence",
+    "*insta": "OnlinePresence",
+    "*links": "OnlinePresence",
     # ── DESCRIPTION ───────────────────────────────────────────
-    '*description':     'Description',
-    '*intro':           'Description',
-    '*desc':            'Description',
-    '*bio':             'Description',
-    '*text':            'Description',
-    
+    "*description": "Description",
+    "*intro": "Description",
+    "*desc": "Description",
+    "*bio": "Description",
+    "*text": "Description",
     # ── MEDIA ─────────────────────────────────────────────────
-    '*image':           'Media',
-    '*images':          'Media',
-    '*img':             'Media',
-    '*photo':           'Media',
-    '*portrait':        'Media',
-    '*logo':            'Media',
-    '*icon':            'Media',
-    '*film':            'Media',
-    '*video':           'Media',
-    '*background':      'Media',
-
+    "*image": "Media",
+    "*images": "Media",
+    "*img": "Media",
+    "*photo": "Media",
+    "*portrait": "Media",
+    "*logo": "Media",
+    "*icon": "Media",
+    "*film": "Media",
+    "*video": "Media",
+    "*background": "Media",
     # ── OPERATIONAL STATUS ────────────────────────────────────
-    '*status':          'OperationalStatus',
-    '*condition':       'OperationalStatus',
-    '*activity':        'OperationalStatus',
-    '*ready':           'OperationalStatus',
-
+    "*status": "OperationalStatus",
+    "*condition": "OperationalStatus",
+    "*activity": "OperationalStatus",
+    "*ready": "OperationalStatus",
     # ── FACILITY METRICS ──────────────────────────────────────
-    '*capacity':        'FacilityMetrics',
-    '*headcount':       'FacilityMetrics',
-    '*staff':           'FacilityMetrics',
-    '*surface':         'FacilityMetrics',
-    '*size':            'FacilityMetrics',
-    '*floor':           'FacilityMetrics',
-    '*there':           'FacilityMetrics',
-    '*number':          'FacilityMetrics',
-    '*year':            'FacilityMetrics',
-    '*founded':         'FacilityMetrics',
-    '*with':            'FacilityMetrics',
-    '*count':           'FacilityMetrics',
-
-
+    "*capacity": "FacilityMetrics",
+    "*headcount": "FacilityMetrics",
+    "*staff": "FacilityMetrics",
+    "*surface": "FacilityMetrics",
+    "*size": "FacilityMetrics",
+    "*floor": "FacilityMetrics",
+    "*there": "FacilityMetrics",
+    "*number": "FacilityMetrics",
+    "*year": "FacilityMetrics",
+    "*founded": "FacilityMetrics",
+    "*with": "FacilityMetrics",
+    "*count": "FacilityMetrics",
     # ── OPERATING SCHEDULE ────────────────────────────────────
-    '*hours':           'Schedule',
-    '*openhours':       'Schedule',
-    '*days':            'Schedule',
-    '*schedule':        'Schedule',
-    '*time':            'Schedule',
-    '*turnaround':      'Schedule',
-
+    "*hours": "Schedule",
+    "*openhours": "Schedule",
+    "*days": "Schedule",
+    "*schedule": "Schedule",
+    "*time": "Schedule",
+    "*turnaround": "Schedule",
     # ── MANUFACTURING PROCESS ─────────────────────────────────
-    '*process':         'ManufacturingProcess',
-    '*production':      'ManufacturingProcess',
-    '*run':             'ManufacturingProcess',
-    '*batch':           'ManufacturingProcess',
-    '*sample':          'ManufacturingProcess',
-    '*order':           'ManufacturingProcess',
-    '*types':           'ManufacturingProcess',
-    '*processes':        'ManufacturingProcess',
-
+    "*process": "ManufacturingProcess",
+    "*production": "ManufacturingProcess",
+    "*run": "ManufacturingProcess",
+    "*batch": "ManufacturingProcess",
+    "*sample": "ManufacturingProcess",
+    "*order": "ManufacturingProcess",
+    "*types": "ManufacturingProcess",
+    "*processes": "ManufacturingProcess",
+    "capabilities": "ManufacturingProcess",
+    "cats": "ManufacturingProcess",
+    "*capabilities": "ManufacturingProcess",
+    "*cats": "ManufacturingProcess",
+    "*type": "ManufacturingProcess",
+    "*category": "ManufacturingProcess",
+    "*categories": "ManufacturingProcess",
+    "*kind": "ManufacturingProcess",
+    "*categoriesfull": "ManufacturingProcess",
     # ── EQUIPMENT ─────────────────────────────────────────────
-    '*equipment':       'Equipment',
-    '*machine':         'Equipment',
-    '*generator':       'Equipment',
-    '*dock':            'Equipment',
-    '*maintenance':     'Equipment',
-    '*power':           'Equipment',
-    '*supply':          'Equipment',
-    '*model':           'Equipment',
-    '*serial':          'Equipment',
-    '*maker':           'Equipment',
-    '*machines':        'Equipment',
-    '*ups':             'Equipment',
-
+    "*equipment": "Equipment",
+    "*machine": "Equipment",
+    "*generator": "Equipment",
+    "*dock": "Equipment",
+    "*maintenance": "Equipment",
+    "*power": "Equipment",
+    "*supply": "Equipment",
+    "*model": "Equipment",
+    "*serial": "Equipment",
+    "*maker": "Equipment",
+    "*machines": "Equipment",
+    "*ups": "Equipment",
     # ── MATERIALS ─────────────────────────────────────────────
-    '*material':        'Material',
-    '*materials':       'Material',
-    '*plastic':         'Material',
-    '*metal':           'Material',
-    '*wood':            'Material',
-    '*elastomer':       'Material',
-    '*ceramics':        'Material',
-    '*electronics':     'Material',
-    '*others':          'Material',
-    '*m_id':            'Material',
-
+    "*material": "Material",
+    "*materials": "Material",
+    "*plastic": "Material",
+    "*metal": "Material",
+    "*wood": "Material",
+    "*elastomer": "Material",
+    "*ceramics": "Material",
+    "*electronics": "Material",
+    "*others": "Material",
+    "*m_id": "Material",
     # ── FACILITY ACCESS ───────────────────────────────────────
-    '*access':          'FacilityAccess',
-    '*wheelchair':      'FacilityAccess',
-    '*road':            'FacilityAccess',
-
+    "*access": "FacilityAccess",
+    "*wheelchair": "FacilityAccess",
+    "*road": "FacilityAccess",
     # ── ORGANIZATION ──────────────────────────────────────────
-    '*affiliation':     'Organization',
-    '*partner':         'Organization',
-    '*funder':          'Organization',
-    '*owner':           'Organization',
-    '*gestion':         'Organization',
-
+    "*affiliation": "Organization",
+    "*partner": "Organization",
+    "*funder": "Organization",
+    "*owner": "Organization",
+    "*gestion": "Organization",
     # ── QUALITY / COMPLIANCE ──────────────────────────────────
-    '*certification':   'Compliance',
-    '*certifications':  'Compliance',
-
+    "*certification": "Compliance",
+    "*certifications": "Compliance",
     # ── PRODUCT ───────────────────────────────────────────────
-    '*product':         'Product',
-    '*products':        'Product',
-
+    "*product": "Product",
+    "*products": "Product",
     # ── NOISE (excluded from analysis) ────────────────────────
-    '*nan':             '_noise',
-    '*bucket':          '_noise',
-    'aai':              '_noise',
-    'icm':              '_noise',
-    '*at':              '_noise',
-    '*d':               '_noise',
-    '*i':               '_noise',
-    '*nan':             '_noise',
-    '*nr':              '_noise',
-
-    # ── CAPABILITIES (fabrication equipment types available) ──
-    'capabilities':     'FabricationCapability',
-    'cats':             'FabricationCapability',
-    '*capabilities':    'FabricationCapability',
-    '*cats':            'FabricationCapability',
-    '*type':            'FabricationCapability',
-    '*category':        'FabricationCapability',
-    '*categories':      'FabricationCapability',
-    '*kind':            'FabricationCapability',
-    '*categoriesfull':  'FabricationCapability',
+    "*nan": "_noise",
+    "*bucket": "_noise",
+    "aai": "_noise",
+    "icm": "_noise",
+    "*at": "_noise",
+    "*d": "_noise",
+    "*i": "_noise",
+    "*nr": "_noise",
 }
 
-COUNTRY_SUFFIXES = ['ke', 'us', 'fr', 'de', 'in', 'cn', 'jp', 'br', 'ru', 'za']
+COUNTRY_SUFFIXES = ["ke", "us", "fr", "de", "in", "cn", "jp", "br", "ru", "za"]
 ACRONYM_MIN_LENGTH = 3  # anything <= 2 chars with no match → Review
+
 
 def extract_core_concept(column_name):
     clean = str(column_name).lower()
-    clean = clean.split('.')[0]                  # "openHours.Mo" → "openhours"
-    clean = re.sub(r'\d+$', '', clean)           # "photo3" → "photo"
+    clean = clean.split(".")[0]  # "openHours.Mo" → "openhours"
+    clean = re.sub(r"\d+$", "", clean)  # "photo3" → "photo"
 
     # Strip country suffixes: "countyKE" → "county"
-    parts = clean.split('_')
+    parts = clean.split("_")
     if len(parts) > 1 and parts[-1] in COUNTRY_SUFFIXES:
         parts = parts[:-1]
-    clean = '_'.join(parts)
+    clean = "_".join(parts)
 
-    clean = clean.replace('-', ' ').replace('_', ' ').strip()
+    clean = clean.replace("-", " ").replace("_", " ").strip()
 
     if not clean:
         return str(column_name).lower()
@@ -842,7 +815,7 @@ def extract_core_concept(column_name):
         if len(root) >= max(shortest_word, 3):
             return root
 
-    nouns = [token.text for token in doc if token.pos_ in ['NOUN', 'PROPN']]
+    nouns = [token.text for token in doc if token.pos_ in ["NOUN", "PROPN"]]
     if nouns:
         candidate = nouns[-1]
         if len(candidate) >= max(shortest_word, 3):
@@ -856,28 +829,29 @@ def extract_core_concept(column_name):
 def get_schema_taxonomy(column_name, init_data):
     """Classifies a column name using the loaded Schema.org DataFrames."""
 
-    types_df = init_data['types_url']
-    props_df = init_data['props_url']
+    types_df = init_data["types_url"]
+    props_df = init_data["props_url"]
 
-    clean_name = str(column_name).lower().replace('_', '').replace(' ', '')
-    
-    prop_match = props_df[props_df['label'].str.lower() == clean_name]
+    clean_name = str(column_name).lower().replace("_", "").replace(" ", "")
+
+    prop_match = props_df[props_df["label"].str.lower() == clean_name]
     if not prop_match.empty:
-        domain_raw = str(prop_match.iloc[0]['domainIncludes']).split(',')[0]
-        return domain_raw.replace('https://schema.org/', '')
+        domain_raw = str(prop_match.iloc[0]["domainIncludes"]).split(",")[0]
+        return domain_raw.replace("https://schema.org/", "")
 
-    type_match = types_df[types_df['label'].str.lower() == clean_name]
+    type_match = types_df[types_df["label"].str.lower() == clean_name]
     if not type_match.empty:
-        parent_raw = str(type_match.iloc[0]['subTypeOf']).split(',')[0]
-        return parent_raw.replace('https://schema.org/', '')
-        
+        parent_raw = str(type_match.iloc[0]["subTypeOf"]).split(",")[0]
+        return parent_raw.replace("https://schema.org/", "")
+
     return f"Unclassified: {column_name}"
+
 
 def get_taxonomy_for_pipeline(column_name, init_data):
     # Normalize
-    clean = str(column_name).lower().split('.')[0]  # strip dot-notation suffix
-    clean = re.sub(r'\d+$', '', clean)              # strip trailing numbers
-    clean = clean.replace('-', '_').strip()
+    clean = str(column_name).lower().split(".")[0]  # strip dot-notation suffix
+    clean = re.sub(r"\d+$", "", clean)  # strip trailing numbers
+    clean = clean.replace("-", "_").strip()
 
     # 1. Exact full-name match
     if clean in FIELD_TAXONOMY:
@@ -885,7 +859,7 @@ def get_taxonomy_for_pipeline(column_name, init_data):
 
     # 2. NLP → core concept → prefixed lookup
     core = extract_core_concept(clean)
-    prefixed = f'*{core}'
+    prefixed = f"*{core}"
     if prefixed in FIELD_TAXONOMY:
         return FIELD_TAXONOMY[prefixed]
 
@@ -901,7 +875,7 @@ def inspect_classification(init_data, dataset):
     full_map = {}
     for name, df in dataset.items():
         full_map[name] = {}
-        for col in df['data_input'].columns:
+        for col in df["data_input"].columns:
             tax = get_taxonomy_for_pipeline(col, init_data)
             full_map[name][col] = tax
 

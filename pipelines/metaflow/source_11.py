@@ -35,10 +35,17 @@ class Source_11(FlowSpec, TailSteps):
     @card(type="html")
     @step
     def clean(self):
-        self.data_input["latitude"] = pd.to_numeric(self.data_input["lat"], errors="coerce")
-        self.data_input["longitude"] = pd.to_numeric(self.data_input["long"], errors="coerce")
+        self.data_input["latitude"] = pd.to_numeric(
+            self.data_input["lat"], errors="coerce"
+        )
+        self.data_input["longitude"] = pd.to_numeric(
+            self.data_input["long"], errors="coerce"
+        )
+        self.data_input.drop(columns=["lat", "long"], inplace=True)
         self.data_input.rename(columns={"website": "web_url"}, inplace=True)
-        self.data_input["record_source_url"] = "https://makerspace.com" + self.data_input["link"]
+        self.data_input["record_source_url"] = (
+            "https://makerspace.com" + self.data_input["link"]
+        )
         self.data_output = self.data_input[
             ["name", "latitude", "longitude", "web_url", "record_source_url"]
         ]
@@ -54,8 +61,6 @@ class Source_11(FlowSpec, TailSteps):
         self.geocode = ReverseGeocode(self.data_output).get()
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
-
-
 
 
 if __name__ == "__main__":

@@ -144,9 +144,9 @@ class JoinData01(FlowSpec):
     @step
     def data_map(self):
 
-        json_string = self.data_output[["latitude", "longitude", "name", "web_url"]].to_json(
-            orient="records"
-        )
+        json_string = self.data_output[
+            ["latitude", "longitude", "name", "web_url"]
+        ].to_json(orient="records")
         final_payload = obfuscate_text(json_string, key="kny5")
 
         self.html = Plot(self.data_output, max_cluster_rad=30).render()

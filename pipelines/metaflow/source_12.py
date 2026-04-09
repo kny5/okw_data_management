@@ -25,15 +25,14 @@ class Source_12(FlowSpec, TailSteps):
     )
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
-    
+
     bypass_geo_filter = Parameter("bypass_geo_filter", default=False)
-    
+
     render_map_ = Parameter("render_map", default=True)
     benchmark_products = Parameter(
         "find", default="facemask|mask|respirator|ventilator"
     )
     keep_data = Parameter("keep_data", default=True)
-
 
     @step
     def start(self):
@@ -71,6 +70,9 @@ class Source_12(FlowSpec, TailSteps):
         self.raw["longitude"] = pd.to_numeric(
             self.raw["location-Longitude"], errors="coerce"
         )
+
+        self.raw.drop(columns=["location-Latitude", "location-Longitude"], inplace=True)
+        
         drop_unverifiable_data = self.raw[
             ~self.raw["country"].isin(["iraq", "somalia", "somaliland"])
         ]
@@ -78,47 +80,48 @@ class Source_12(FlowSpec, TailSteps):
         self.data_input = pd.concat([self.raw, self.patch], ignore_index=True)
 
         self.data_input.columns = self.data_input.columns.str.lower()
-        self.data_input = self.data_input.rename(columns={
-            'fid':                                          'form_id',
-            'countyke':                                     'county',
-            'subcountyke':                                  'subcounty',
-            'dbdistrict':                                   'district',
-            'addr_district':                                'district',
-            'addr_parish':                                  'parish',
-            'addr_village':                                 'village',
-            'addr_street':                                  'street',
-            'bio':                                          'owner_bio',
-            'type':                                         'facility_type',
-            'working_hours':                                'opening_hours',
-            'working_days':                                 'opening_days',
-            'size_floor_size':                              'floor_surface_m2',
-            'storage_capacity':                             'storage_capacity_m2',
-            'facility_status':                              'operational_status',
-            'back_up_generator':                            'backup_generator',
-            'loading_dock':                                 'loading_dock',
-            'uninterrupted_power_supply':                   'ups_available',
-            'wheelchair_access':                            'wheelchair_accessible',
-            'road_access':                                  'road_accessible',
-            'the_equipment_available_for_us':               'equipment_available',
-            'typical_products_of_the_facility':             'typical_products',
-            'please_provide_the_model':                     'equipment_model',
-            'please_provide_the_serial_number':             'equipment_serial',
-            'wikipedia_url_of_the_machine':                 'equipment_wiki_url',
-            'how_many_are_there':                           'equipment_count',
-            'manufacturing_process_001':                    'manufacturing_process',
-            'wikipedia_url_of_the_anufacturing_process':    'process_wiki_url',
-            'materials_used':                               'materials_used',
-            'plastic_s_type':                               'plastic_type',
-            'metal_s_type':                                 'metal_type',
-            'elastomer_s_type':                             'elastomer_type',
-            'access_type_1':                                'access_type',
-            'partner_funder':                               'funding_partner',
-            'social_fb':                                    'facebook',
-            'social_twitter':                               'twitter',
-            'social_insta':                                 'instagram',
-            'date_founded':                                 'year_founded',
-        })
-
+        self.data_input = self.data_input.rename(
+            columns={
+                "fid": "form_id",
+                "countyke": "county",
+                "subcountyke": "subcounty",
+                "dbdistrict": "district",
+                "addr_district": "district",
+                "addr_parish": "parish",
+                "addr_village": "village",
+                "addr_street": "street",
+                "bio": "owner_bio",
+                "type": "facility_type",
+                "working_hours": "opening_hours",
+                "working_days": "opening_days",
+                "size_floor_size": "floor_surface_m2",
+                "storage_capacity": "storage_capacity_m2",
+                "facility_status": "operational_status",
+                "back_up_generator": "backup_generator",
+                "loading_dock": "loading_dock",
+                "uninterrupted_power_supply": "ups_available",
+                "wheelchair_access": "wheelchair_accessible",
+                "road_access": "road_accessible",
+                "the_equipment_available_for_us": "equipment_available",
+                "typical_products_of_the_facility": "typical_products",
+                "please_provide_the_model": "equipment_model",
+                "please_provide_the_serial_number": "equipment_serial",
+                "wikipedia_url_of_the_machine": "equipment_wiki_url",
+                "how_many_are_there": "equipment_count",
+                "manufacturing_process_001": "manufacturing_process",
+                "wikipedia_url_of_the_anufacturing_process": "process_wiki_url",
+                "materials_used": "materials_used",
+                "plastic_s_type": "plastic_type",
+                "metal_s_type": "metal_type",
+                "elastomer_s_type": "elastomer_type",
+                "access_type_1": "access_type",
+                "partner_funder": "funding_partner",
+                "social_fb": "facebook",
+                "social_twitter": "twitter",
+                "social_insta": "instagram",
+                "date_founded": "year_founded",
+            }
+        )
 
         patch_verified_data = pd.concat(
             [drop_unverifiable_data, self.patch], ignore_index=True

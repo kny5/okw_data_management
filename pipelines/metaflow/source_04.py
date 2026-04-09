@@ -54,8 +54,6 @@ class Source_04(FlowSpec, TailSteps):
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
 
-  
-
 
 if __name__ == "__main__":
     Source_04()

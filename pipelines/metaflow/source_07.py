@@ -67,7 +67,5 @@ class Source_07(FlowSpec, TailSteps):
         self.next(self.visualise)
 
 
-
-
 if __name__ == "__main__":
     Source_07()

@@ -1,5 +1,5 @@
 from metaflow import step, card, current
-from metaflow.cards import Image, Table, Markdown
+from metaflow.cards import Image, Markdown
 import pandas as pd
 from __visualisations__ import Plot, Tabular, generate_sparsity_plots
 
@@ -26,16 +26,18 @@ class TailSteps:
     @step
     def data_map(self):
         """Renders the output DataFrame on a map if the render_map parameter is set to True."""
-        if getattr(self, 'render_map_', False): # Safely check for attribute
+        if getattr(self, "render_map_", False):  # Safely check for attribute
             current.card.append(Markdown(Plot(self.data_output).base64_iframe()))
         self.next(self.wrapup)
 
-    @card #(type="blank")
+    @card  # (type="blank")
     @step
     def data_stats(self):
         """Calculates sparsity metrics and saves them as a table artifact."""
 
-        url_line = f"\n\n## Data origin:<br>{self.url}" if getattr(self, "url", None) else ""
+        url_line = (
+            f"\n\n## Data origin:<br>{self.url}" if getattr(self, "url", None) else ""
+        )
 
         markdown_text = (
             f"# Data Sparsity Analysis for {current.flow_name}"
@@ -44,7 +46,7 @@ class TailSteps:
             f"\n\nOutput: {len(self.data_output.columns.tolist())}\nRecords: {len(self.data_output)}"
         )
         current.card.append(Markdown(markdown_text))
-        
+
         ## Maps
         current.card.append(Markdown("### Input Data Map"))
         current.card.append(Markdown(Plot(self.data_input).base64_iframe()))
@@ -53,22 +55,21 @@ class TailSteps:
         current.card.append(Markdown(Plot(self.data_output).base64_iframe()))
 
         # Clean Dictionary to handle names without overwriting Metaflow state variables
-        datasets = {
-            "Input Data": self.data_input, 
-            "Output Data": self.data_output
-        }
+        datasets = {"Input Data": self.data_input, "Output Data": self.data_output}
 
         for name, dt in datasets.items():
             current.card.append(Markdown(f"### {name} Sparsity"))
-            
+
             if not dt.empty:
                 col_sparsity = (dt.isnull().mean() * 100).round(2)
                 avg_row_sparsity = round(dt.isnull().mean(axis=1).mean() * 100, 2)
 
-                df = pd.DataFrame({
-                    "Metric": [f"Col: {col}" for col in col_sparsity.index],
-                    "Value": col_sparsity.values.tolist(),
-                })
+                df = pd.DataFrame(
+                    {
+                        "Metric": [f"Col: {col}" for col in col_sparsity.index],
+                        "Value": col_sparsity.values.tolist(),
+                    }
+                )
 
                 df.sort_values(by="Value", ascending=False, inplace=True)
                 current.card.append(Markdown(Tabular(df).base64_iframe()))
@@ -103,14 +104,14 @@ class TailSteps:
     @step
     def wrapup(self, inputs):
         """Finalizes the output data by safely propagating the dataframes."""
-        
+
         # Iterate to safely find the artifacts rather than blindly trusting inputs[0]
         for inp in inputs:
-            if hasattr(inp, 'data_output'):
+            if hasattr(inp, "data_output"):
                 self.data_output = inp.data_output
-            if hasattr(inp, 'data_input'):
+            if hasattr(inp, "data_input"):
                 self.data_input = inp.data_input
-                
+
         print(self.data_output.shape)
         print(self.data_output.columns.tolist())
         self.next(self.end)

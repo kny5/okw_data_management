@@ -41,16 +41,21 @@ class Source_10(FlowSpec, TailSteps):
                 "site_web": "web_url",
                 "geo.latitude": "latitude",
                 "geo.longitude": "longitude",
-            }, inplace=True
+            },
+            inplace=True,
         )
         filtered = self.data_input[self.data_input["status"] != "closed"]
         self.duplicates = filter_points_by_proximity(
             filtered, radius=int(self.radius_), min_points=int(self.min_points_)
         )
         self.html = Tabular(self.duplicates).table_output()
-        self.data_output = filtered[["name", "latitude", "longitude", "web_url", "makery_id"]]
+        self.data_output = filtered[
+            ["name", "latitude", "longitude", "web_url", "makery_id"]
+        ]
         print(self.data_output.columns.tolist())
-        self.data_output = self.data_output[~self.data_output.isin(self.duplicates).all(axis=1)]
+        self.data_output = self.data_output[
+            ~self.data_output.isin(self.duplicates).all(axis=1)
+        ]
 
         self.next(self.transform)
 
@@ -69,8 +74,6 @@ class Source_10(FlowSpec, TailSteps):
         self.geocode = ReverseGeocode(self.data_output).get()
         self.html = Tabular(self.geocode).table_output()
         self.next(self.visualise)
-
-
 
 
 if __name__ == "__main__":

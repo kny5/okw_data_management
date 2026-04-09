@@ -33,9 +33,22 @@ from __functions__ import (
     inject_secure_map_logic,
     generate_blake2_uid,
 )
-from __visualisations__ import Plot, Tabular, create_bubble_density_plot, graph_dataframe_relationships, heatmap_bubble_dri, plot_semantic_dendrogram, plot_schema_network, plot_schema_network_2, plot_category_lines, plot_category_bars, plot_category_heatmap
+from __visualisations__ import (
+    Plot,
+    Tabular,
+    create_bubble_density_plot,
+    graph_dataframe_relationships,
+    heatmap_bubble_dri,
+    plot_semantic_dendrogram,
+    plot_schema_network,
+    plot_schema_network_2,
+    plot_category_lines,
+    plot_category_heatmap,
+    plot_source_volume_vs_loss
+)
 from metaflow import Flow, FlowSpec, card, resources, step, Parameter, Runner, current
 from metaflow.cards import Markdown, Image
+
 LOAD_HTML = None
 
 TYPES_URL = "https://raw.githubusercontent.com/schemaorg/schemaorg/main/data/releases/29.4/schemaorg-current-https-types.csv"
@@ -46,7 +59,7 @@ types_df = pd.read_csv(TYPES_URL)
 props_df = pd.read_csv(PROPS_URL)
 
 
-INIT_DATA = {'types_url': types_df, 'props_url': props_df}
+INIT_DATA = {"types_url": types_df, "props_url": props_df}
 
 SOURCES = [
     "Source_02",
@@ -60,6 +73,7 @@ SOURCES = [
     "Source_11",
     "Source_12",
 ]
+
 
 class JoinData01(FlowSpec):
     """Metaflow pipeline for aggregating and visualizing distributed manufacturing data."""
@@ -77,19 +91,19 @@ class JoinData01(FlowSpec):
         self.sources = SOURCES
 
         self.next(self.get_or_generate_data, foreach="sources")
-    
+
     @step
     def get_or_generate_data(self):
         source_name = self.input
         print(f"Processing source: {source_name}")
-        
+
         try:
-            if getattr(self, 'recreate', False): # Safely check recreate flag
+            if getattr(self, "recreate", False):  # Safely check recreate flag
                 raise Exception("Recreation requested")
-            
+
             run_data = Flow(source_name).latest_successful_run.data
             print(f"✅ Fetched existing data for {source_name}")
-            
+
         except Exception:
             path = f"pipelines/metaflow/{source_name.lower()}.py"
             print(f"🔄 Running {path} via Runner...")
@@ -98,14 +112,15 @@ class JoinData01(FlowSpec):
                     print(f"✅ {running.run} finished successfully.")
                     run_data = running.run.data
                 else:
-                    raise Exception(f"❌ {running.run} failed with status: {running.status}")
+                    raise Exception(
+                        f"❌ {running.run} failed with status: {running.status}"
+                    )
 
         # ✅ ACTUALLY unwrap into top-level artifacts so the join step can find them
         self.data_output = run_data.data_output
         self.data_input = run_data.data_input
-        
-        self.next(self.concatenate)
 
+        self.next(self.concatenate)
 
     @card
     @step
@@ -118,10 +133,10 @@ class JoinData01(FlowSpec):
         # 1. Iterate correctly over the Metaflow Inputs iterable
         for inp in inputs:
             # 2. Extract the source_name (which was the foreach 'input')
-            key = inp.input 
+            key = inp.input
 
             # 3. Safely check for the top-level artifact 'data_output'
-            if hasattr(inp, 'data_output'):
+            if hasattr(inp, "data_output"):
                 out_df = inp.data_output
                 if isinstance(out_df, pd.DataFrame) and not out_df.empty:
                     lazy_output_dfs.append(out_df)
@@ -131,16 +146,18 @@ class JoinData01(FlowSpec):
                 print(f"No data_output on branch: {key}")
 
             # 4. Safely check for the top-level artifact 'data_input'
-            if hasattr(inp, 'data_input'):
+            if hasattr(inp, "data_input"):
                 in_df = inp.data_input
                 if isinstance(in_df, pd.DataFrame) and not in_df.empty:
                     lazy_input_dfs.append(in_df)
             # Safely store the DataFrame (not the Metaflow object)
-            self.dataset[key] = {'data_output': out_df, 'data_input': in_df}
+            self.dataset[key] = {"data_output": out_df, "data_input": in_df}
 
         # 5. Final Safety Catch
         if not lazy_output_dfs:
-            raise ValueError("No valid data_output DataFrames found. Check upstream steps.")
+            raise ValueError(
+                "No valid data_output DataFrames found. Check upstream steps."
+            )
 
         self.append_source_output = pd.concat(lazy_output_dfs, ignore_index=True)
         self.next(self.clean)
@@ -200,7 +217,6 @@ class JoinData01(FlowSpec):
         self.html = Tabular(self.data_output).table_output()
         self.next(self.wrap_up)
 
-
     @card(type="html")
     @step
     def data_map(self):
@@ -210,7 +226,6 @@ class JoinData01(FlowSpec):
             LOAD_HTML = Plot(self.data_output, max_cluster_rad=60).render()
             self.html = LOAD_HTML
         self.next(self.wrap_up)
-
 
     @card
     @step
@@ -229,16 +244,24 @@ class JoinData01(FlowSpec):
         print(self.most_common_words)
 
         """Calculates metrics and generates the Dendrogram card."""
-        
+
         current.card.append(Markdown("# DataFrame Taxonomy Clustering"))
 
         dendrogram_fig = plot_semantic_dendrogram(self.classified_data[0])
-        
-        current.card.append(Markdown("The dendrogram above shows how the datasets cluster together based on the semantic similarity of their columns. Datasets that share more similar column names and concepts are grouped closer together."))
+
+        current.card.append(
+            Markdown(
+                "The dendrogram above shows how the datasets cluster together based on the semantic similarity of their columns. Datasets that share more similar column names and concepts are grouped closer together."
+            )
+        )
         current.card.append(Image.from_matplotlib(dendrogram_fig))
 
         current.card.append(Markdown("# DataFrame Relationship Graph"))
-        current.card.append(Markdown("This graph visualizes the relationships between the different datasets based on shared columns and semantic similarity."))
+        current.card.append(
+            Markdown(
+                "This graph visualizes the relationships between the different datasets based on shared columns and semantic similarity."
+            )
+        )
         current.card.append(Image.from_matplotlib(self.classified_data[1]))
 
         current.card.append(Markdown(str(self.classified_data[0])))
@@ -246,17 +269,22 @@ class JoinData01(FlowSpec):
         full_map = inspect_classification(INIT_DATA, self.dataset)
 
         current.card.append(Markdown("# Full Classification Map"))
-        current.card.append(Markdown("This map shows the classification of all columns across the datasets to inspect how they relate to each other and to common concepts in the manufacturing domain."))
+        current.card.append(
+            Markdown(
+                "This map shows the classification of all columns across the datasets to inspect how they relate to each other and to common concepts in the manufacturing domain."
+            )
+        )
         current.card.append(Markdown(str(full_map)))
 
         current.card.append(Markdown("# Network Graph of DataFrame Relationships"))
         network_fig = plot_schema_network(self.dataset, INIT_DATA)
         current.card.append(Image.from_matplotlib(network_fig))
 
-        current.card.append(Markdown("# Network Graph of DataFrame Relationships ALTERNATIVE LAYOUT"))
+        current.card.append(
+            Markdown("# Network Graph of DataFrame Relationships ALTERNATIVE LAYOUT")
+        )
         network_fig_2 = plot_schema_network_2(full_map)
         current.card.append(Image.from_matplotlib(network_fig_2))
-
 
         current.card.append(Markdown("# Category Relationship Lines"))
         network_fig_3 = plot_category_lines(full_map)
@@ -267,25 +295,32 @@ class JoinData01(FlowSpec):
         current.card.append(Image.from_matplotlib(category_fig))
 
         current.card.append(Markdown("# Bubble density of Categories by Dataset"))
-        category_fig_4 = create_bubble_density_plot(full_map, title="Bubble Density of Categories by Dataset")
+        category_fig_4 = create_bubble_density_plot(
+            full_map, title="Bubble Density of Categories by Dataset"
+        )
         current.card.append(Image.from_matplotlib(category_fig_4))
 
         current.card.append(Markdown("---"))
         current.card.append(Markdown("# DRI Taxonomy Focus"))
-        
+
         dri_fig = heatmap_bubble_dri(full_map)
-        
+
         current.card.append(Image.from_matplotlib(dri_fig))
 
-        self.next(self.wrap_up)
 
+        current.card.append(Markdown("Plot data quality metrics for dataset"))
+        category_fig_qs = plot_source_volume_vs_loss(
+            self.dataset, title="Source Benchmark: Data Loss vs. Input Volume"
+        )
+        current.card.append(Image.from_matplotlib(category_fig_qs))
+
+        self.next(self.wrap_up)
 
     @step
     def joint(self, inputs):
         """Joins the outputs from the different visualization steps and prepares the data for the final wrap-up step."""
         self.data_output = inputs[0].data_output
         self.next(self.encryption_map)
-
 
     @card(type="html")
     @step
@@ -311,19 +346,16 @@ class JoinData01(FlowSpec):
 
         self.next(self.wrap_up)
 
-
     @card
     @step
     def wrap_up(self, inputs):
         """Finalizes the output data by safely propagating the dataframes."""
-        
-        self.next(self.end)
 
+        self.next(self.end)
 
     @step
     def end(self):
         """Final step to print the output DataFrame and its details for verification."""
-
 
 
 if __name__ == "__main__":
