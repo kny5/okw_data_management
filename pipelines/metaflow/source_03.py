@@ -15,7 +15,7 @@ from __metasteps__ import TailSteps
 
 class Source_03(FlowSpec, TailSteps):
     url = "https://www.google.com/maps/d/u/0/viewer?mid=10q6m1yyAUzFn2zqDcRwq-qInUmvoVz4q&ll=37.844558%2C-122.27696200000003&z=8"
-    render_map_ = Parameter("render_map", default=False)
+    render_map_ = Parameter("render_map", default=True)
 
     @step
     def start(self):

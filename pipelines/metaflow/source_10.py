@@ -20,7 +20,7 @@ class Source_10(FlowSpec, TailSteps):
     url = Parameter("url", default="https://makery.gogocarto.fr/api/elements.json")
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
-    render_map_ = Parameter("render_map", default=False)
+    render_map_ = Parameter("render_map", default=True)
 
     @step
     def start(self):

@@ -22,7 +22,7 @@ class Source_07(FlowSpec, TailSteps):
     )
     radius_ = Parameter("radius", default=5)
     min_points_ = Parameter("min_points", default=4)
-    render_map_ = Parameter("render_map", default=False)
+    render_map_ = Parameter("render_map", default=True)
 
     @step
     def start(self):

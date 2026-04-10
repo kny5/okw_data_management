@@ -19,7 +19,7 @@ class Source_09(FlowSpec, TailSteps):
         "url",
         default="https://wiki.hackerspaces.org/w/api.php?action=parse&oldid=95416&prop=text&format=json&origin=*",
     )
-    render_map_ = Parameter("render_map", default=False)
+    render_map_ = Parameter("render_map", default=True)
 
     @step
     def start(self):

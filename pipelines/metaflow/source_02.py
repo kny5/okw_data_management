@@ -55,7 +55,7 @@ class Source_02(FlowSpec, TailSteps):
     url = "https://api.fablabs.io/0/labs.json"
     radius_ = Parameter("radius", default=100)
     min_points_ = Parameter("min_points", default=2)
-    render_map_ = Parameter("render_map", default=False)
+    render_map_ = Parameter("render_map", default=True)
 
     @step
     def start(self):

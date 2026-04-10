@@ -27,7 +27,7 @@ def html_collector(html_content):
 
 class Source_05(FlowSpec):
     url = "https://www.makertour.fr/map"
-    render_map_ = Parameter("render_map", default=False)
+    render_map_ = Parameter("render_map", default=True)
 
     @step
     def start(self):
