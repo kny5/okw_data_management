@@ -219,7 +219,6 @@ dependencies:
   - pyparsing=3.3.2
   - pyside6=6.11.0
   - pysocks=1.7.1
-  - python=3.14.3
   - python-dateutil=2.9.0.post0
   - python-levenshtein=0.27.3
   - python-tzdata=2025.3
@@ -310,7 +309,6 @@ dependencies:
   - zlib-ng=2.3.3
   - zstd=1.5.7
   - pip:
-      - en-core-web-sm==3.8.0
       - metaflow-card-html==1.0.3
       - metaflow-profiler==0.1.0
       - psutil==7.2.2
