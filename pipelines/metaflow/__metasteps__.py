@@ -22,14 +22,14 @@ class TailSteps:
         self.html = Tabular(self.data_output).table_output()
         self.next(self.wrapup)
 
-    @card
+    @card(type="html")
     @step
     def data_map(self):
         """Renders the output DataFrame on a map if the render_map parameter is set to True."""
         self.html = Plot(self.data_output).render()
         self.next(self.wrapup)
 
-    @card  # (type="blank")
+    @card(type="blank")
     @step
     def data_stats(self):
         """Calculates sparsity metrics and saves them as a table artifact."""
