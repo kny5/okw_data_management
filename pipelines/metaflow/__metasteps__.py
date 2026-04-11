@@ -22,12 +22,11 @@ class TailSteps:
         self.html = Tabular(self.data_output).table_output()
         self.next(self.wrapup)
 
-    @card(type="blank")
+    @card
     @step
     def data_map(self):
         """Renders the output DataFrame on a map if the render_map parameter is set to True."""
-        if getattr(self, "render_map_", True):  # Safely check for attribute
-            current.card.append(Markdown(Plot(self.data_output).base64_iframe()))
+        self.html = Plot(self.data_output).render()
         self.next(self.wrapup)
 
     @card  # (type="blank")
