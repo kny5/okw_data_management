@@ -247,15 +247,14 @@ class JoinData01(FlowSpec):
 
         current.card.append(Markdown("# DataFrame Taxonomy Clustering"))
 
-        dendrogram_fig = plot_semantic_dendrogram(self.classified_data[0])
+        self.dendrogram_fig = plot_semantic_dendrogram(self.classified_data[0])
 
         current.card.append(
             Markdown(
                 "The dendrogram above shows how the datasets cluster together based on the semantic similarity of their columns. Datasets that share more similar column names and concepts are grouped closer together."
             )
         )
-        current.card.append(Image.from_matplotlib(dendrogram_fig))
-
+        current.card.append(Image.from_matplotlib(self.dendrogram_fig))
         current.card.append(Markdown("# DataFrame Relationship Graph"))
         current.card.append(
             Markdown(
@@ -263,10 +262,9 @@ class JoinData01(FlowSpec):
             )
         )
         current.card.append(Image.from_matplotlib(self.classified_data[1]))
-
         current.card.append(Markdown(str(self.classified_data[0])))
 
-        full_map = inspect_classification(INIT_DATA, self.dataset)
+        self.full_map = inspect_classification(INIT_DATA, self.dataset)
 
         current.card.append(Markdown("# Full Classification Map"))
         current.card.append(
@@ -274,45 +272,49 @@ class JoinData01(FlowSpec):
                 "This map shows the classification of all columns across the datasets to inspect how they relate to each other and to common concepts in the manufacturing domain."
             )
         )
-        current.card.append(Markdown(str(full_map)))
-
+        current.card.append(Markdown(str(self.full_map)))
         current.card.append(Markdown("# Network Graph of DataFrame Relationships"))
-        network_fig = plot_schema_network(self.dataset, INIT_DATA)
-        current.card.append(Image.from_matplotlib(network_fig))
-
+        
+        self.network_fig = plot_schema_network(self.dataset, INIT_DATA)
+        
+        current.card.append(Image.from_matplotlib(self.network_fig))
         current.card.append(
             Markdown("# Network Graph of DataFrame Relationships ALTERNATIVE LAYOUT")
         )
-        network_fig_2 = plot_schema_network_2(full_map)
-        current.card.append(Image.from_matplotlib(network_fig_2))
-
+        
+        self.network_fig_2 = plot_schema_network_2(self.full_map)
+        
+        current.card.append(Image.from_matplotlib(self.network_fig_2))
         current.card.append(Markdown("# Category Relationship Lines"))
-        network_fig_3 = plot_category_lines(full_map)
-        current.card.append(Image.from_matplotlib(network_fig_3))
-
+        
+        self.network_fig_3 = plot_category_lines(self.full_map)
+        
+        current.card.append(Image.from_matplotlib(self.network_fig_3))
         current.card.append(Markdown("# Category Column Count"))
-        category_fig = plot_category_heatmap(full_map)
-        current.card.append(Image.from_matplotlib(category_fig))
-
+        
+        self.category_fig = plot_category_heatmap(self.full_map)
+        
+        current.card.append(Image.from_matplotlib(self.category_fig))
         current.card.append(Markdown("# Bubble density of Categories by Dataset"))
-        category_fig_4 = create_bubble_density_plot(
-            full_map, title="Bubble Density of Categories by Dataset"
+        
+        self.category_fig_4 = create_bubble_density_plot(
+            self.full_map, title="Bubble Density of Categories by Dataset"
         )
-        current.card.append(Image.from_matplotlib(category_fig_4))
-
+        
+        current.card.append(Image.from_matplotlib(self.category_fig_4))
         current.card.append(Markdown("---"))
         current.card.append(Markdown("# DRI Taxonomy Focus"))
 
-        dri_fig = heatmap_bubble_dri(full_map)
+        self.dri_fig = heatmap_bubble_dri(self.full_map)
 
-        current.card.append(Image.from_matplotlib(dri_fig))
-
-
+        current.card.append(Image.from_matplotlib(self.dri_fig))
         current.card.append(Markdown("Plot data quality metrics for dataset"))
-        category_fig_qs = plot_source_volume_vs_loss(
+        
+        self.category_fig_qs = plot_source_volume_vs_loss(
             self.dataset, title="Source Benchmark: Data Loss vs. Input Volume"
         )
-        current.card.append(Image.from_matplotlib(category_fig_qs))
+        
+        current.card.append(Image.from_matplotlib(self.category_fig_qs))
 
         self.next(self.wrap_up)
 
