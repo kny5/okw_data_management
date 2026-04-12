@@ -12,7 +12,6 @@ class TailSteps:
         id = current.flow_name[-2:]
         self.data_output["source"] = id
 
-        # Branch into three parallel card-generating steps
         self.next(self.data_table, self.data_map, self.data_stats)
 
     @card(type="html")
@@ -22,11 +21,11 @@ class TailSteps:
         self.html = Tabular(self.data_output).table_output()
         self.next(self.wrapup)
 
-    @card(type='html')
+    @card(type="html")
     @step
     def data_map(self):
         """Renders the output DataFrame on a map if the render_map parameter is set to True."""
-        
+
         map_output = Plot(self.data_output)
         map_input = Plot(self.data_input)
 
@@ -34,7 +33,6 @@ class TailSteps:
 
         self.map_input = map_input.into_html()
 
-        
         self.next(self.wrapup)
 
     @card(type="blank")
@@ -54,14 +52,12 @@ class TailSteps:
         )
         current.card.append(Markdown(markdown_text))
 
-        ## Maps
         current.card.append(Markdown("### Input Data Map"))
         current.card.append(Markdown(Plot(self.data_input).base64_iframe()))
 
         current.card.append(Markdown("### Output Data Map"))
         current.card.append(Markdown(Plot(self.data_output).base64_iframe()))
 
-        # Clean Dictionary to handle names without overwriting Metaflow state variables
         datasets = {"Input Data": self.data_input, "Output Data": self.data_output}
 
         for name, dt in datasets.items():
@@ -81,14 +77,12 @@ class TailSteps:
                 df.sort_values(by="Value", ascending=False, inplace=True)
                 current.card.append(Markdown(Tabular(df).base64_iframe()))
 
-                # Only save the summary stats for the final Output Data for later steps
                 if name == "Output Data":
                     self.sparsity_summary = {
                         "total_records": len(dt),
                         "avg_row_sparsity_pct": avg_row_sparsity,
                     }
 
-        ## Generate sparsity plots ONCE outside the loop
         splot = generate_sparsity_plots([self])
         if splot and len(splot) >= 2:
             current.card.append(Image.from_matplotlib(splot[0]))
@@ -98,7 +92,6 @@ class TailSteps:
             r=self.data_output.shape, c=self.data_output.columns.tolist()
         )
 
-        ## Summary markdown
         current.card.append(
             Markdown(
                 f"## Data Summary\n{self.count.split(', ')[0]} records with an average row sparsity of {self.sparsity_summary.get('avg_row_sparsity_pct', 'N/A')}%"
@@ -112,7 +105,6 @@ class TailSteps:
     def wrapup(self, inputs):
         """Finalizes the output data by safely propagating the dataframes."""
 
-        # Iterate to safely find the artifacts rather than blindly trusting inputs[0]
         for inp in inputs:
             if hasattr(inp, "data_output"):
                 self.data_output = inp.data_output

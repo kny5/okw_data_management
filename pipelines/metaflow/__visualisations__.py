@@ -39,6 +39,7 @@ import pandas as pd
 import pandas as pd
 import seaborn as sns
 from adjustText import adjust_text
+
 opt.maxBytes = 0
 
 
@@ -443,7 +444,6 @@ def graph_dataframe_relationships(dataset, data_init):
     print("^" * 50)
     print(type(dataset))
     print(dataset.keys())
-    # breakpoint()
     dataset_contents = {}
     for name, df in dataset.items():
         classified = set()
@@ -456,29 +456,25 @@ def graph_dataframe_relationships(dataset, data_init):
 
     print("\nTaxonomy Mapping Complete. Generating Heatmap...")
 
-    # 2. Build the Co-occurrence Matrix
     matrix = pd.DataFrame(
         index=dataset_contents.keys(), columns=dataset_contents.keys(), dtype=int
     )
 
     for name1 in dataset_contents.keys():
         for name2 in dataset_contents.keys():
-            # Count how many semantic concepts these two dataframes share
             overlap = len(dataset_contents[name1].intersection(dataset_contents[name2]))
             matrix.loc[name1, name2] = overlap
 
-    # 3. Visualize using Seaborn
     fig = plt.figure(figsize=(12, 10))
 
-    # Optional: Mask the top right triangle since it's a mirrored matrix
     mask = np.triu(np.ones_like(matrix, dtype=bool), k=1)
 
     sns.heatmap(
         matrix,
         mask=mask,
-        annot=True,  # Show the numbers in the boxes
-        cmap="Blues",  # Use a clean blue gradient
-        fmt="g",  # CHANGED: 'g' handles both ints and NaN-floats gracefully
+        annot=True,
+        cmap="Blues",
+        fmt="g",
         cbar_kws={"label": "Number of Shared Semantic Classes"},
     )
 
@@ -503,16 +499,11 @@ def plot_semantic_dendrogram(dataset_contents):
     """
     print("Extracting features for hierarchical clustering...")
 
-    # 1. Get all unique semantic concepts across all dataframes
     all_concepts = set()
-    # FIXED: Iterate over the dictionary values, not .columns
     for concepts in dataset_contents.values():
         all_concepts.update(concepts)
 
-    # 2. Build a binary feature matrix
-    # Rows: DataFrames, Columns: Concepts (1 = has concept, 0 = missing)
     feature_data = []
-    # FIXED: Explicitly grab the dictionary keys
     df_names = list(dataset_contents.keys())
 
     for name in df_names:
@@ -526,11 +517,9 @@ def plot_semantic_dendrogram(dataset_contents):
 
     print("Calculating linkage and rendering Dendrogram...")
 
-    # 3. Calculate distance and linkage
     distance_matrix = pdist(feature_matrix, metric="jaccard")
     linked = linkage(distance_matrix, method="average")
 
-    # 4. Render the Dendrogram
     fig = plt.figure(figsize=(12, 8))
 
     dendrogram(
@@ -552,7 +541,6 @@ def plot_semantic_dendrogram(dataset_contents):
     plt.gca().spines["right"].set_visible(False)
     plt.tight_layout()
 
-    # Save a physical copy to your machine
     fig.savefig("semantic_dendrogram.png", dpi=300, bbox_inches="tight")
 
     plt.close(fig)
@@ -566,10 +554,8 @@ def plot_schema_network(dataset, data_init):
     """
     print("Building schema network graph...")
 
-    # Initialize an undirected graph
     G = nx.Graph()
 
-    # Track node types so we can color-code them later
     sources = set()
     columns = set()
     categories = set()
@@ -579,31 +565,23 @@ def plot_schema_network(dataset, data_init):
         G.add_node(name, type="source")
 
         for col in df["data_input"].columns.tolist():
-            # Classify the column using your existing pipeline function
-            # Ensure get_taxonomy_for_pipeline is imported/available in this scope
             category = get_taxonomy_for_pipeline(col, data_init)
 
             columns.add(col)
             categories.add(category)
 
-            # Add nodes
             G.add_node(col, type="column")
             G.add_node(category, type="category")
 
-            # Add edges linking them together
-            G.add_edge(name, col)  # Connect Source to its Column
-            G.add_edge(col, category)  # Connect Column to its Schema Category
+            G.add_edge(name, col)
+            G.add_edge(col, category)
 
     print(f"Network built: {len(G.nodes)} nodes and {len(G.edges)} edges.")
 
-    # Render the graph
     fig = plt.figure(figsize=(18, 14))
 
-    # spring_layout uses a force-directed algorithm to push apart unrelated nodes
-    # and pull together highly connected ones. (k controls the distance between nodes)
     pos = nx.spring_layout(G, k=0.3, iterations=50)
 
-    # Draw Nodes by type with distinct colors and sizes
     nx.draw_networkx_nodes(
         G,
         pos,
@@ -631,21 +609,17 @@ def plot_schema_network(dataset, data_init):
         label="Original Columns",
     )
 
-    # Draw Edges (make them light grey so they don't overpower the text)
     nx.draw_networkx_edges(G, pos, alpha=0.15, edge_color="gray")
 
-    # Draw Labels (Column names, Source names, etc.)
     nx.draw_networkx_labels(G, pos, font_size=8, font_family="sans-serif")
 
     plt.title("Data Schema Relationship Network", fontsize=20, pad=20)
 
-    # Add a legend
     plt.legend(scatterpoints=1, loc="upper right", fontsize=12)
-    plt.axis("off")  # Hide the standard x/y graph box
+    plt.axis("off")
 
     plt.tight_layout()
 
-    # Close the figure background to save memory and return the object
     plt.close(fig)
     return fig
 
@@ -657,7 +631,10 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
     import numpy as np
 
     exclude_classes = exclude_classes or {
-        "_noise", "SystemField", "OnlinePresence", "Coordinates",
+        "_noise",
+        "SystemField",
+        "OnlinePresence",
+        "Coordinates",
     }
 
     G = nx.Graph()
@@ -671,12 +648,11 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
             G.add_edge(source, cls)
             G.add_edge(cls, col)
 
-    # Remove categories connected to only one source
     categories_to_remove = [
-        n for n, d in G.nodes(data=True)
+        n
+        for n, d in G.nodes(data=True)
         if d.get("kind") == "category"
-        and sum(1 for nb in G.neighbors(n)
-                if G.nodes[nb].get("kind") == "source") < 2
+        and sum(1 for nb in G.neighbors(n) if G.nodes[nb].get("kind") == "source") < 2
     ]
     G.remove_nodes_from(categories_to_remove)
     G.remove_nodes_from([n for n in list(G.nodes()) if G.degree(n) == 0])
@@ -686,55 +662,59 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
         ax.text(0.5, 0.5, "No shared categories found.", ha="center", va="center")
         return fig
 
-    # ── Layout: spring with higher k pushes nodes apart ──────
-    # Use kamada_kawai as base then spread category nodes outward
     pos = nx.kamada_kawai_layout(G, scale=3)
 
-    # Push category nodes further from center to reduce label overlap
     center = np.mean(list(pos.values()), axis=0)
     for node, d in G.nodes(data=True):
         if d.get("kind") == "category":
             vec = pos[node] - center
             norm = np.linalg.norm(vec)
             if norm > 0:
-                pos[node] = center + vec * 1.6  # push outward
+                pos[node] = center + vec * 1.6
 
-    # ── Node styling ─────────────────────────────────────────
     color_map = {"source": "#C0392B", "category": "#27AE60", "column": "#85C1E9"}
-    size_map  = {"source": 1200,      "category": 600,        "column": 60}
-    alpha_map = {"source": 0.95,      "category": 0.90,       "column": 0.60}
+    size_map = {"source": 1200, "category": 600, "column": 60}
+    alpha_map = {"source": 0.95, "category": 0.90, "column": 0.60}
 
-    node_list   = list(G.nodes())
+    node_list = list(G.nodes())
     node_colors = [color_map[G.nodes[n]["kind"]] for n in node_list]
-    node_sizes  = [size_map[G.nodes[n]["kind"]] for n in node_list]
+    node_sizes = [size_map[G.nodes[n]["kind"]] for n in node_list]
     node_alphas = [alpha_map[G.nodes[n]["kind"]] for n in node_list]
 
     fig, ax = plt.subplots(figsize=(20, 16))
 
-    # ── Draw edges first ─────────────────────────────────────
-    # Separate edge types for visual hierarchy
     source_cat_edges = [
-        (u, v) for u, v in G.edges()
+        (u, v)
+        for u, v in G.edges()
         if G.nodes[u].get("kind") in ("source", "category")
         and G.nodes[v].get("kind") in ("source", "category")
     ]
-    cat_col_edges = [
-        (u, v) for u, v in G.edges()
-        if (u, v) not in source_cat_edges
-    ]
+    cat_col_edges = [(u, v) for u, v in G.edges() if (u, v) not in source_cat_edges]
 
-    nx.draw_networkx_edges(G, pos, edgelist=source_cat_edges,
-                           edge_color="#888888", width=1.0,
-                           alpha=0.6, ax=ax)
-    nx.draw_networkx_edges(G, pos, edgelist=cat_col_edges,
-                           edge_color="#cccccc", width=0.3,
-                           alpha=0.3, ax=ax)
+    nx.draw_networkx_edges(
+        G,
+        pos,
+        edgelist=source_cat_edges,
+        edge_color="#888888",
+        width=1.0,
+        alpha=0.6,
+        ax=ax,
+    )
+    nx.draw_networkx_edges(
+        G,
+        pos,
+        edgelist=cat_col_edges,
+        edge_color="#cccccc",
+        width=0.3,
+        alpha=0.3,
+        ax=ax,
+    )
 
-    # ── Draw nodes by kind separately to control alpha ───────
     for kind in ("column", "category", "source"):
         nodelist = [n for n in node_list if G.nodes[n]["kind"] == kind]
         nx.draw_networkx_nodes(
-            G, pos,
+            G,
+            pos,
             nodelist=nodelist,
             node_color=[color_map[kind]] * len(nodelist),
             node_size=[size_map[kind]] * len(nodelist),
@@ -742,19 +722,12 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
             ax=ax,
         )
 
-    # ── Labels: source and category only, NO draw_networkx ───
-    # draw_networkx draws all labels — use draw_networkx_labels
-    # with explicit node subsets to avoid double rendering and
-    # column label clutter
+    source_labels = {n: n[-2:] for n, d in G.nodes(data=True) if d["kind"] == "source"}
+    category_labels = {n: n for n, d in G.nodes(data=True) if d["kind"] == "category"}
 
-    source_labels   = {n: n[-2:] for n, d in G.nodes(data=True)
-                       if d["kind"] == "source"}
-    category_labels = {n: n for n, d in G.nodes(data=True)
-                       if d["kind"] == "category"}
-
-    # Source labels — bold, white, inside node
     nx.draw_networkx_labels(
-        G, pos,
+        G,
+        pos,
         labels=source_labels,
         font_size=8,
         font_color="white",
@@ -762,11 +735,10 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
         ax=ax,
     )
 
-    # Category labels — offset above node to avoid overlap with node circle
-    pos_above = {n: (x, y + 0.18) for n, (x, y) in pos.items()
-                 if n in category_labels}
+    pos_above = {n: (x, y + 0.18) for n, (x, y) in pos.items() if n in category_labels}
     nx.draw_networkx_labels(
-        G, pos_above,
+        G,
+        pos_above,
         labels=category_labels,
         font_size=9,
         font_color="#1A5E38",
@@ -774,7 +746,6 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
         ax=ax,
     )
 
-    # ── Legend ───────────────────────────────────────────────
     legend_handles = [
         mpatches.Patch(color="#C0392B", label="Data source"),
         mpatches.Patch(color="#27AE60", label="Semantic category"),
@@ -791,7 +762,10 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
 
     plt.title(
         "Schema category network — shared categories only",
-        fontsize=13, fontfamily="serif", fontweight="bold", pad=16
+        fontsize=13,
+        fontfamily="serif",
+        fontweight="bold",
+        pad=16,
     )
     plt.axis("off")
     plt.tight_layout()
@@ -801,7 +775,6 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
 def plot_category_lines(full_map):
     """Line plot of column count per category, one line per source."""
 
-    # Collect all categories across all sources (excluding noise/review)
     all_categories = sorted(
         {
             cls
@@ -811,7 +784,6 @@ def plot_category_lines(full_map):
         }
     )
 
-    # Build count matrix: source → {category: count}
     source_counts = {}
     for source_name, col_map in full_map.items():
         counter = {}
@@ -821,7 +793,6 @@ def plot_category_lines(full_map):
             counter[cls] = counter.get(cls, 0) + 1
         source_counts[source_name] = counter
 
-    # Plot
     fig, ax = plt.subplots(figsize=(14, 6))
     x = np.arange(len(all_categories))
     colors = plt.cm.tab10.colors
@@ -858,7 +829,6 @@ def plot_category_lines(full_map):
 
 def plot_category_bars(full_map):
     """Grouped bar chart of column count per category, one group per category."""
-    # Collect all categories across all sources
     all_categories = sorted(
         {
             cls
@@ -868,7 +838,6 @@ def plot_category_bars(full_map):
         }
     )
 
-    # Build count matrix
     source_names = list(full_map.keys())
     source_counts = {}
     for source_name, col_map in full_map.items():
@@ -879,7 +848,6 @@ def plot_category_bars(full_map):
             counter[cls] = counter.get(cls, 0) + 1
         source_counts[source_name] = counter
 
-    # Layout
     x = np.arange(len(all_categories))
     n_sources = len(source_names)
     bar_width = 0.8 / n_sources
@@ -934,10 +902,8 @@ def plot_category_heatmap(full_map):
                 continue
             matrix.loc[source_name, cls] += 1
 
-    # ── Sort rows by total richness (descending) ──
     matrix = matrix.loc[matrix.sum(axis=1).sort_values(ascending=False).index]
 
-    # ── Sort columns by total presence (descending) ──
     matrix = matrix[matrix.sum(axis=0).sort_values(ascending=False).index]
 
     fig, ax = plt.subplots(figsize=(16, len(source_names) * 0.8 + 2))
@@ -973,12 +939,14 @@ def plot_category_heatmap(full_map):
 def create_bubble_density_plot(
     full_map, title="Bubble Density of Categories by Dataset"
 ):
-    all_categories = sorted({
-        cls
-        for col_map in full_map.values()
-        for cls in col_map.values()
-        if cls != "_noise" and not str(cls).startswith("Review")
-    })
+    all_categories = sorted(
+        {
+            cls
+            for col_map in full_map.values()
+            for cls in col_map.values()
+            if cls != "_noise" and not str(cls).startswith("Review")
+        }
+    )
 
     source_names = list(full_map.keys())
     df = pd.DataFrame(0, index=source_names, columns=all_categories)
@@ -989,38 +957,36 @@ def create_bubble_density_plot(
                 continue
             df.loc[source_name, cls] += 1
 
-    # ── FAULT 1 FIX: drop empty rows before computing fill rate ──
     df = df.loc[(df > 0).any(axis=1)]
 
-    # Sort
     df = df.loc[df.sum(axis=1).sort_values(ascending=False).index]
     df = df[df.sum(axis=0).sort_values(ascending=False).index]
 
-    # ── FAULT 2 FIX: use fixed denominator ───────────────────────
     total_classes = len(all_categories)  # consistent across all sources
     source_fill_rate = (df > 0).sum(axis=1) / total_classes * 100
 
-    # Melt
     df_melted = (
         df.reset_index()
-          .melt(id_vars="index", var_name="Category", value_name="Count")
-          .rename(columns={"index": "Source"})
+        .melt(id_vars="index", var_name="Category", value_name="Count")
+        .rename(columns={"index": "Source"})
     )
 
     df_melted["Source_Fill_Rate"] = df_melted["Source"].map(source_fill_rate)
 
-    # ── FAULT 3 FIX: guard against silent NaN fill rates ─────────
     missing = df_melted["Source_Fill_Rate"].isna().sum()
     if missing > 0:
-        print(f"Warning: {missing} rows have NaN fill rate — check source name alignment")
+        print(
+            f"Warning: {missing} rows have NaN fill rate — check source name alignment"
+        )
 
     df_plot = df_melted[df_melted["Count"] > 0].copy()
 
     fig, ax = plt.subplots(figsize=(16, len(df.index) * 0.8 + 2))
 
     if df_plot.empty:
-        ax.text(0.5, 0.5, "No data to display after filtering.",
-                ha="center", va="center")
+        ax.text(
+            0.5, 0.5, "No data to display after filtering.", ha="center", va="center"
+        )
         return fig
 
     sns.scatterplot(
@@ -1038,8 +1004,12 @@ def create_bubble_density_plot(
 
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right", fontsize=9)
     ax.set_title(title, fontsize=13, pad=15)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left",
-              borderaxespad=0, title="Fill Rate (%) & Count")
+    ax.legend(
+        bbox_to_anchor=(1.05, 1),
+        loc="upper left",
+        borderaxespad=0,
+        title="Fill Rate (%) & Count",
+    )
     ax.grid(True, linestyle="--", alpha=0.3)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -1066,14 +1036,15 @@ def heatmap_bubble_dri(full_map, title="Subset 1 Taxonomy Coverage"):
         "fabricationCapability",
     }
 
-    # ── Build matrix ─────────────────────────────────────────
     source_names = list(full_map.keys())
-    existing = sorted({
-        cls
-        for col_map in full_map.values()
-        for cls in col_map.values()
-        if cls in DRI_CATEGORIES
-    })
+    existing = sorted(
+        {
+            cls
+            for col_map in full_map.values()
+            for cls in col_map.values()
+            if cls in DRI_CATEGORIES
+        }
+    )
 
     matrix = pd.DataFrame(0, index=source_names, columns=existing)
     for source, col_map in full_map.items():
@@ -1085,43 +1056,38 @@ def heatmap_bubble_dri(full_map, title="Subset 1 Taxonomy Coverage"):
     matrix = matrix.loc[matrix.sum(axis=1).sort_values(ascending=False).index]
     matrix = matrix[matrix.sum(axis=0).sort_values(ascending=False).index]
 
-    # ── FAULT 1 FIX: fixed denominator = full DRI definition size ─
     fill_rate = (matrix > 0).sum(axis=1) / len(DRI_CATEGORIES) * 100
 
     df_melted = (
         matrix.reset_index()
-              .melt(id_vars="index", var_name="Category", value_name="Count")
-              .rename(columns={"index": "Source"})
+        .melt(id_vars="index", var_name="Category", value_name="Count")
+        .rename(columns={"index": "Source"})
     )
     df_melted["Fill_Rate"] = df_melted["Source"].map(fill_rate)
 
-    # Guard against silent NaN fill rates
     missing = df_melted["Fill_Rate"].isna().sum()
     if missing > 0:
-        print(f"Warning: {missing} rows have NaN fill rate — check source name alignment")
+        print(
+            f"Warning: {missing} rows have NaN fill rate — check source name alignment"
+        )
 
     df_plot = df_melted[df_melted["Count"] > 0].copy()
 
-    # ── FAULT 3 FIX: derive layout sizes after all filtering ──────
-    cat_order    = list(matrix.columns)
+    cat_order = list(matrix.columns)
     source_order = list(matrix.index)
-    n_cats       = len(cat_order)
-    n_sources    = len(source_order)
+    n_cats = len(cat_order)
+    n_sources = len(source_order)
 
     fig, ax = plt.subplots(figsize=(n_cats * 1.2 + 2, n_sources * 0.65 + 2))
 
     if df_plot.empty:
-        ax.text(0.5, 0.5, "No DRI data to display.",
-                ha="center", va="center")
+        ax.text(0.5, 0.5, "No DRI data to display.", ha="center", va="center")
         return fig
 
-    # ── Color map ─────────────────────────────────────────────
     cmap = cm.YlGn
     norm = mcolors.Normalize(vmin=0, vmax=100)
-    # FAULT 2 FIX: removed dead apply() line — scatter handles color directly
 
-    # ── Bubble size scaling ───────────────────────────────────
-    max_count  = df_plot["Count"].max()
+    max_count = df_plot["Count"].max()
     size_scale = df_plot["Count"].apply(lambda c: (c / max_count) * 900 + 80)
 
     df_plot["x"] = df_plot["Category"].apply(lambda c: cat_order.index(c))
@@ -1139,20 +1105,22 @@ def heatmap_bubble_dri(full_map, title="Subset 1 Taxonomy Coverage"):
         linewidths=0.4,
     )
 
-    # ── Annotate count inside bubble ─────────────────────────
     for _, row in df_plot.iterrows():
         ax.text(
-            row["x"], row["y"],
+            row["x"],
+            row["y"],
             str(int(row["Count"])),
-            ha="center", va="center",
-            fontsize=7, fontweight="500",
+            ha="center",
+            va="center",
+            fontsize=7,
+            fontweight="500",
             color="white" if row["Fill_Rate"] > 55 else "#333333",
         )
 
-    # ── Axes ─────────────────────────────────────────────────
     ax.set_xticks(range(n_cats))
-    ax.set_xticklabels(cat_order, rotation=40, ha="right",
-                       fontsize=9, fontfamily="serif")
+    ax.set_xticklabels(
+        cat_order, rotation=40, ha="right", fontsize=9, fontfamily="serif"
+    )
     ax.set_yticks(range(n_sources))
     ax.set_yticklabels(source_order, fontsize=9, fontfamily="serif")
 
@@ -1160,33 +1128,32 @@ def heatmap_bubble_dri(full_map, title="Subset 1 Taxonomy Coverage"):
     ax.set_ylim(-0.6, n_sources - 0.4)
     ax.invert_yaxis()
 
-    ax.set_xlabel("Semantic category", fontsize=10,
-                  fontfamily="serif", labelpad=10)
-    ax.set_ylabel("Data source", fontsize=10,
-                  fontfamily="serif", labelpad=10)
-    ax.set_title(title, fontsize=12, fontfamily="serif",
-                 fontweight="bold", pad=14)
+    ax.set_xlabel("Semantic category", fontsize=10, fontfamily="serif", labelpad=10)
+    ax.set_ylabel("Data source", fontsize=10, fontfamily="serif", labelpad=10)
+    ax.set_title(title, fontsize=12, fontfamily="serif", fontweight="bold", pad=14)
 
-    # ── Grid ─────────────────────────────────────────────────
     ax.set_axisbelow(True)
     ax.grid(True, linestyle=":", linewidth=0.5, color="#cccccc", alpha=0.8)
     for spine in ax.spines.values():
         spine.set_visible(False)
 
-    # ── Colorbar ──────────────────────────────────────────────
     cbar = fig.colorbar(scatter, ax=ax, pad=0.02, fraction=0.025, aspect=30)
     cbar.set_label("DRI fill rate (%)", fontsize=9, fontfamily="serif")
     cbar.ax.tick_params(labelsize=8)
     cbar.outline.set_visible(False)
 
-    # ── Bubble size legend ────────────────────────────────────
     legend_counts = sorted([c for c in [1, 2, 4, max_count] if c <= max_count])
     legend_handles = [
-        plt.scatter([], [],
-                    s=(c / max_count) * 900 + 80,
-                    color="#888888", alpha=0.7,
-                    edgecolors="#444444", linewidths=0.4,
-                    label=str(c))
+        plt.scatter(
+            [],
+            [],
+            s=(c / max_count) * 900 + 80,
+            color="#888888",
+            alpha=0.7,
+            edgecolors="#444444",
+            linewidths=0.4,
+            label=str(c),
+        )
         for c in legend_counts
     ]
     legend = ax.legend(
@@ -1207,133 +1174,160 @@ def heatmap_bubble_dri(full_map, title="Subset 1 Taxonomy Coverage"):
     return fig
 
 
-def plot_source_volume_vs_loss(dataset_dict, title="Source Benchmark: Data Loss vs. Input Volume"):
+def plot_source_volume_vs_loss(
+    dataset_dict, title="Source Benchmark: Data Loss vs. Input Volume"
+):
     """
-    Parses a nested dictionary, robustly calculates data loss and input volume 
+    Parses a nested dictionary, robustly calculates data loss and input volume
     regardless of strict data types, and generates a 4-quadrant scatter plot.
     """
     records = []
-    
-    # 1. Robustly parse the dictionary
-    for source_name, nested_data in dataset_dict.items():
-        # Ensure the value is actually a dictionary before trying to use .get()
-        if not isinstance(nested_data, dict):
-            continue 
 
-        d_in = nested_data.get('data_input')
-        d_out = nested_data.get('data_output')
-        
+    for source_name, nested_data in dataset_dict.items():
+        if not isinstance(nested_data, dict):
+            continue
+
+        d_in = nested_data.get("data_input")
+        d_out = nested_data.get("data_output")
+
         try:
-            # Try to get row count via .shape[0] (Pandas), fallback to len() (Lists/Dicts)
-            input_rows = d_in.shape[0] if hasattr(d_in, 'shape') else len(d_in) if d_in is not None else 0
-            output_rows = d_out.shape[0] if hasattr(d_out, 'shape') else len(d_out) if d_out is not None else 0
-            
-            # Only append if we actually have input data
+            input_rows = (
+                d_in.shape[0]
+                if hasattr(d_in, "shape")
+                else len(d_in) if d_in is not None else 0
+            )
+            output_rows = (
+                d_out.shape[0]
+                if hasattr(d_out, "shape")
+                else len(d_out) if d_out is not None else 0
+            )
+
             if input_rows > 0:
-                records.append({
-                    'source': source_name,
-                    'input_rows': input_rows,
-                    'output_rows': output_rows
-                })
+                records.append(
+                    {
+                        "source": source_name,
+                        "input_rows": input_rows,
+                        "output_rows": output_rows,
+                    }
+                )
         except TypeError as e:
             print(f"Skipping {source_name}: Unable to calculate length. Error: {e}")
             continue
-            
+
     df = pd.DataFrame(records)
-    
-    # Trigger the error if parsing completely failed
+
     if df.empty:
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.text(0.5, 0.5, "Error: Could not extract valid row counts from dataset_dict.", ha='center', va='center')
-        ax.axis('off')
+        ax.text(
+            0.5,
+            0.5,
+            "Error: Could not extract valid row counts from dataset_dict.",
+            ha="center",
+            va="center",
+        )
+        ax.axis("off")
         return fig
-    
-    # 2. Calculate Data Loss Percentage
-    df['data_loss_pct'] = ((df['input_rows'] - df['output_rows']) / df['input_rows']) * 100
-    df['data_loss_pct'] = df['data_loss_pct'].clip(lower=0)
-    
-    # 3. Calculate thresholds for the quadrants
-    median_loss = df['data_loss_pct'].median()
-    median_volume = df['input_rows'].median()
 
-    # 4. Setup the figure
-    # 4. Setup the figure
+    df["data_loss_pct"] = (
+        (df["input_rows"] - df["output_rows"]) / df["input_rows"]
+    ) * 100
+    df["data_loss_pct"] = df["data_loss_pct"].clip(lower=0)
+
+    median_loss = df["data_loss_pct"].median()
+    median_volume = df["input_rows"].median()
+
     fig, ax = plt.subplots(figsize=(12, 8))
-    
+
     sns.scatterplot(
-        data=df, 
-        x='data_loss_pct', 
-        y='input_rows', 
-        s=150,             # Slightly smaller bubbles to reduce clutter
-        color='steelblue',
-        edgecolor='black',
+        data=df,
+        x="data_loss_pct",
+        y="input_rows",
+        s=150,
+        color="steelblue",
+        edgecolor="black",
         alpha=0.8,
-        ax=ax
+        ax=ax,
     )
-    
-    # --- FIX 1: Use a Logarithmic Scale for Volume ---
-    ax.set_yscale('log')
-    
-    # 5. Add the Quadrant crosshairs (these will automatically map correctly to the log scale)
-    ax.axvline(median_loss, color='gray', linestyle='--', alpha=0.7)
-    ax.axhline(median_volume, color='gray', linestyle='--', alpha=0.7)
-    
-    # --- FIX 2: Use adjust_text to prevent label overlap ---
+
+    ax.set_yscale("log")
+
+    ax.axvline(median_loss, color="gray", linestyle="--", alpha=0.7)
+    ax.axhline(median_volume, color="gray", linestyle="--", alpha=0.7)
+
     texts = []
     for i in range(df.shape[0]):
         texts.append(
             ax.text(
-                df['data_loss_pct'].iloc[i], 
-                df['input_rows'].iloc[i], 
-                df['source'].iloc[i], 
+                df["data_loss_pct"].iloc[i],
+                df["input_rows"].iloc[i],
+                df["source"].iloc[i],
                 fontsize=9,
-                weight='bold'
+                weight="bold",
             )
         )
-    
-    # This automatically repels the text away from each other and draws a tiny line if needed
-    adjust_text(texts, arrowprops=dict(arrowstyle="-", color='gray', lw=0.5))
 
-    # 7. Add Quadrant Annotations
-    props = dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='gray')
-    
-    ax.text(0.02, 0.96, 'High Volume, Low Loss\n(Core Sources)', transform=ax.transAxes, 
-            fontsize=11, verticalalignment='top', bbox=props)
-    ax.text(0.98, 0.96, 'High Volume, High Loss\n(Rich but Noisy)', transform=ax.transAxes, 
-            fontsize=11, verticalalignment='top', horizontalalignment='right', bbox=props)
-    ax.text(0.02, 0.04, 'Low Volume, Low Loss\n(Reliable Niche)', transform=ax.transAxes, 
-            fontsize=11, verticalalignment='bottom', bbox=props)
-    ax.text(0.98, 0.04, 'Low Volume, High Loss\n(Low Value)', transform=ax.transAxes, 
-            fontsize=11, verticalalignment='bottom', horizontalalignment='right', bbox=props)
+    adjust_text(texts, arrowprops=dict(arrowstyle="-", color="gray", lw=0.5))
 
-    # 8. Formatting
+    props = dict(boxstyle="round", facecolor="white", alpha=0.8, edgecolor="gray")
+
+    ax.text(
+        0.02,
+        0.96,
+        "High Volume, Low Loss\n(Core Sources)",
+        transform=ax.transAxes,
+        fontsize=11,
+        verticalalignment="top",
+        bbox=props,
+    )
+    ax.text(
+        0.98,
+        0.96,
+        "High Volume, High Loss\n(Rich but Noisy)",
+        transform=ax.transAxes,
+        fontsize=11,
+        verticalalignment="top",
+        horizontalalignment="right",
+        bbox=props,
+    )
+    ax.text(
+        0.02,
+        0.04,
+        "Low Volume, Low Loss\n(Reliable Niche)",
+        transform=ax.transAxes,
+        fontsize=11,
+        verticalalignment="bottom",
+        bbox=props,
+    )
+    ax.text(
+        0.98,
+        0.04,
+        "Low Volume, High Loss\n(Low Value)",
+        transform=ax.transAxes,
+        fontsize=11,
+        verticalalignment="bottom",
+        horizontalalignment="right",
+        bbox=props,
+    )
+
     ax.set_title(title, fontsize=15, pad=20)
     ax.set_xlabel("Data Loss After Filtering (%) ➔", fontsize=12)
     ax.set_ylabel("Input Row Volume (Log Scale) ➔", fontsize=12)
-    
-    # --- FIX 1: Widen the X-axis buffer ---
-    # Pushes X=0 further right, and the max value further left
-    x_min_val = df['data_loss_pct'].min()
-    x_max_val = df['data_loss_pct'].max()
+
+    x_min_val = df["data_loss_pct"].min()
+    x_max_val = df["data_loss_pct"].max()
     ax.set_xlim(left=min(-10, x_min_val - 10), right=min(115, x_max_val + 20))
-    
-    # --- FIX 2: Multiply/Divide for Log Scale Y-axis buffer ---
-    # This pulls Source_12 down from the ceiling and Source_08 up from the floor
-    y_min_val = df['input_rows'].min()
-    y_max_val = df['input_rows'].max()
-    
-    # Use 0.2 (divide by 5) for the floor and 4.0 (multiply by 4) for the ceiling 
-    # to create massive visual breathing room on a log scale
+
+    y_min_val = df["input_rows"].min()
+    y_max_val = df["input_rows"].max()
+
     ax.set_ylim(bottom=y_min_val * 0.2, top=y_max_val * 4.0)
-    
-    # Push the quadrant labels to the absolute back so bubbles always float above them
-    # if they do happen to get close.
+
     for text_obj in ax.texts:
-        if 'Volume' in text_obj.get_text():  # Target only the quadrant labels
+        if "Volume" in text_obj.get_text():
             text_obj.set_zorder(1)
             text_obj.set_alpha(0.85)
 
-    ax.grid(True, linestyle=':', alpha=0.6)
+    ax.grid(True, linestyle=":", alpha=0.6)
     fig.tight_layout()
-    
+
     return fig

@@ -36,7 +36,7 @@ nlp = spacy.load(MODEL)
 
 def _safe_to_rgba(c, alpha=None):
     try:
-        # If upsetplot passes 'NaN', convert it to a transparent RGBA tuple
+
         if isinstance(c, float) and math.isnan(c):
             return (0.0, 0.0, 0.0, 0.0)
     except Exception:
@@ -44,7 +44,6 @@ def _safe_to_rgba(c, alpha=None):
     return _original_to_rgba(c, alpha)
 
 
-# Override the strict parser with our safe one
 mcolors.to_rgba = _safe_to_rgba
 
 
@@ -96,9 +95,7 @@ def req_data(
         verbose:
     """
 
-    @retry_on_exception(
-        max_retries=5, backoff_factor=2
-    )  # Increase max retries and backoff factor
+    @retry_on_exception(max_retries=5, backoff_factor=2)
     def inner():
         response = requests.get(url, headers=head)
         if response.status_code == 200:
@@ -111,7 +108,7 @@ def req_data(
             logging.error(f"Error Response: {response.status_code} ({url})")
             raise Exception("Request failed")
 
-    return inner()  # Directly return the response
+    return inner()
 
 
 def marsh_json(dataframe):
@@ -317,7 +314,7 @@ def cluster_and_aggregate(df, distance_threshold=100, similarity_threshold=0.8):
     df["cluster"] = db.labels_
 
     aggregated_data = []
-    processed_names = set()  # Track processed names
+    processed_names = set()
 
     for cluster_id, cluster_df in df.groupby("cluster"):
         cluster_df = cluster_df.reset_index(drop=True)
@@ -487,34 +484,34 @@ def inject_secure_map_logic(html_string, encrypted_payload):
         }}
     }}
 
-    // --- 2. UI INTERACTION & RENDERING LOGIC ---
+    
     document.getElementById('unlock-btn').addEventListener('click', function() {{
         let userSecretKey = document.getElementById('map-key-input').value;
         let rawJsonString = decryptData("{encrypted_payload}", userSecretKey);
         
         let mapData;
         
-        // --- TEST 1: IS THE JSON VALID? ---
+        
         try {{
-            // Snip both leading AND trailing garbage just in case
+            
             let cleanJsonString = rawJsonString.substring(rawJsonString.indexOf('['), rawJsonString.lastIndexOf(']') + 1);
             mapData = JSON.parse(cleanJsonString);
             
         }} catch (parseError) {{
-            // If it fails here, the password was genuinely wrong
+           
             console.error("Password failed or JSON is corrupt:", parseError);
             document.getElementById('error-msg').style.display = 'block';
-            return; // Stop the script
+            return;
         }}
 
-        // --- IF WE REACH HERE, THE PASSWORD IS CORRECT! ---
-        document.getElementById('secure-overlay').style.display = 'none'; // Hide the login box
         
-        // --- TEST 2: IS THE MAP CRASHING? ---
+        document.getElementById('secure-overlay').style.display = 'none'; 
+        
+    
         try {{
             renderSecureMap(mapData, userSecretKey);
         }} catch (renderError) {{
-            // If it fails here, your custom JS or Leaflet is crashing!
+            
             console.error("The map crashed while trying to draw the pins:");
             console.error(renderError);
         }}
@@ -542,20 +539,18 @@ def inject_secure_map_logic(html_string, encrypted_payload):
             
             if (!row.latitude || !row.longitude) continue;
 
-            // 1. BRIDGE TO YOUR EXTERNAL JS:
-            // Format the object back into the array your script expects
+            
             let marker = L.marker([row.latitude, row.longitude]);
             marker.bindPopup("<div style='font-family: monospace; color: #888;'>Decrypting...</div>");
 
-            // 3. SECURE OVERRIDE: 
-            // Intercept the click to decrypt the text and rewrite the popup on the fly
+            
             marker.on('click', function(e) {{
                 let popup = e.target.getPopup();
                 
                 let realName = decryptData(row.name, validKey);
                 let realUrl = decryptData(row.web_url, validKey);
 
-                // Rebuild your exact jQuery template with the clean text
+                
                 let secureContent = $(`<div id='pop_content' class='pop_custom' style='width: 100.0%; height: 100.0%;'>
                                         <a href="${{realUrl}}" target="_blank"><strong>${{realName}}</strong></a>
                                       </div>`)[0];
@@ -565,7 +560,7 @@ def inject_secure_map_logic(html_string, encrypted_payload):
             secureCluster.addLayer(marker);
         }}
         
-        // FIX 3: Add the cluster layer back to the main map!
+        
         myMap.addLayer(secureCluster);
     }}
     </script>
@@ -587,7 +582,6 @@ def img_uri(img):
 # Prefix keys with '*' to mark them as core-concept matches (post-NLP extraction).
 # No prefix = exact full column name match (checked first, before NLP).
 
-# Your complete domain taxonomy — no Schema.org dependency
 FIELD_TAXONOMY = {
     # ── IDENTITY ──────────────────────────────────────────────
     "*name": "Identifier",
@@ -780,15 +774,14 @@ FIELD_TAXONOMY = {
 }
 
 COUNTRY_SUFFIXES = ["ke", "us", "fr", "de", "in", "cn", "jp", "br", "ru", "za"]
-ACRONYM_MIN_LENGTH = 3  # anything <= 2 chars with no match → Review
+ACRONYM_MIN_LENGTH = 3
 
 
 def extract_core_concept(column_name):
     clean = str(column_name).lower()
-    clean = clean.split(".")[0]  # "openHours.Mo" → "openhours"
-    clean = re.sub(r"\d+$", "", clean)  # "photo3" → "photo"
+    clean = clean.split(".")[0]
+    clean = re.sub(r"\d+$", "", clean)
 
-    # Strip country suffixes: "countyKE" → "county"
     parts = clean.split("_")
     if len(parts) > 1 and parts[-1] in COUNTRY_SUFFIXES:
         parts = parts[:-1]
@@ -799,14 +792,9 @@ def extract_core_concept(column_name):
     if not clean:
         return str(column_name).lower()
 
-    # Single word — return as-is, no NLP, no transformation
-    # This preserves acronyms (icm, aai) and short names (id, fb)
     if len(clean.split()) == 1:
         return clean
 
-    # Multi-word: extract core noun via NLP
-    # But only if the result is not shorter than the shortest input word
-    # This prevents "size floor size" → "size" replacing a meaningful compound
     shortest_word = min(len(w) for w in clean.split())
     doc = nlp(clean)
 
@@ -821,7 +809,6 @@ def extract_core_concept(column_name):
         if len(candidate) >= max(shortest_word, 3):
             return candidate
 
-    # NLP produced something too short or meaningless — return last meaningful word
     words = [w for w in clean.split() if len(w) >= 3]
     return words[-1] if words else clean.split()[-1]
 
@@ -848,22 +835,18 @@ def get_schema_taxonomy(column_name, init_data):
 
 
 def get_taxonomy_for_pipeline(column_name, init_data):
-    # Normalize
     clean = str(column_name).lower().split(".")[0]  # strip dot-notation suffix
     clean = re.sub(r"\d+$", "", clean)  # strip trailing numbers
     clean = clean.replace("-", "_").strip()
 
-    # 1. Exact full-name match
     if clean in FIELD_TAXONOMY:
         return FIELD_TAXONOMY[clean]
 
-    # 2. NLP → core concept → prefixed lookup
     core = extract_core_concept(clean)
     prefixed = f"*{core}"
     if prefixed in FIELD_TAXONOMY:
         return FIELD_TAXONOMY[prefixed]
 
-    # 3. Schema.org fallback
     return get_schema_taxonomy(core, init_data)
 
 

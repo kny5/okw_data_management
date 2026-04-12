@@ -72,7 +72,7 @@ class Source_12(FlowSpec, TailSteps):
         )
 
         self.raw.drop(columns=["location-Latitude", "location-Longitude"], inplace=True)
-        
+
         drop_unverifiable_data = self.raw[
             ~self.raw["country"].isin(["iraq", "somalia", "somaliland"])
         ]

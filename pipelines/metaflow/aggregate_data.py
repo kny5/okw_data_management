@@ -26,7 +26,7 @@ Description: Metaflow pipeline for aggregating data from multiple sources, clean
 
 import pandas as pd
 import matplotlib.pyplot as plt
-    
+
 import io
 
 from __functions__ import (
@@ -48,11 +48,10 @@ from __visualisations__ import (
     plot_schema_network_2,
     plot_category_lines,
     plot_category_heatmap,
-    plot_source_volume_vs_loss
+    plot_source_volume_vs_loss,
 )
 from metaflow import Flow, FlowSpec, card, resources, step, Parameter, Runner, current
 from metaflow.cards import Markdown, Image, Table
-
 
 LOAD_HTML = None
 
@@ -121,7 +120,6 @@ class JoinData01(FlowSpec):
                         f"❌ {running.run} failed with status: {running.status}"
                     )
 
-        # ✅ ACTUALLY unwrap into top-level artifacts so the join step can find them
         self.data_output = run_data.data_output
         self.data_input = run_data.data_input
 
@@ -135,12 +133,9 @@ class JoinData01(FlowSpec):
         lazy_input_dfs = []
         self.dataset = {}
 
-        # 1. Iterate correctly over the Metaflow Inputs iterable
         for inp in inputs:
-            # 2. Extract the source_name (which was the foreach 'input')
             key = inp.input
 
-            # 3. Safely check for the top-level artifact 'data_output'
             if hasattr(inp, "data_output"):
                 out_df = inp.data_output
                 if isinstance(out_df, pd.DataFrame) and not out_df.empty:
@@ -150,15 +145,12 @@ class JoinData01(FlowSpec):
             else:
                 print(f"No data_output on branch: {key}")
 
-            # 4. Safely check for the top-level artifact 'data_input'
             if hasattr(inp, "data_input"):
                 in_df = inp.data_input
                 if isinstance(in_df, pd.DataFrame) and not in_df.empty:
                     lazy_input_dfs.append(in_df)
-            # Safely store the DataFrame (not the Metaflow object)
             self.dataset[key] = {"data_output": out_df, "data_input": in_df}
 
-        # 5. Final Safety Catch
         if not lazy_output_dfs:
             raise ValueError(
                 "No valid data_output DataFrames found. Check upstream steps."
@@ -232,18 +224,22 @@ class JoinData01(FlowSpec):
             self.html = LOAD_HTML
         self.next(self.wrap_up)
 
-    @card(type='blank')
+    @card(type="blank")
     @step
     def data_stats(self):
         global types_df, props_df
-        
+
         def fig_to_bytes(fig):
             buf = io.BytesIO()
-            fig.savefig(buf, format='png', bbox_inches='tight')
+            fig.savefig(buf, format="png", bbox_inches="tight")
             return buf.getvalue()
 
-        self.most_common_words = self.data_output["name"].str.split().explode().value_counts().head(20)
-        self.classified_data = graph_dataframe_relationships(self.dataset, data_init=INIT_DATA)
+        self.most_common_words = (
+            self.data_output["name"].str.split().explode().value_counts().head(20)
+        )
+        self.classified_data = graph_dataframe_relationships(
+            self.dataset, data_init=INIT_DATA
+        )
         self.full_map = inspect_classification(INIT_DATA, self.dataset)
 
         dendrogram_fig = plot_semantic_dendrogram(self.classified_data[0])
@@ -252,7 +248,9 @@ class JoinData01(FlowSpec):
         network_fig_2 = plot_schema_network_2(self.full_map)
         network_fig_3 = plot_category_lines(self.full_map)
         category_fig = plot_category_heatmap(self.full_map)
-        category_fig_4 = create_bubble_density_plot(self.full_map, title="Bubble Density")
+        category_fig_4 = create_bubble_density_plot(
+            self.full_map, title="Bubble Density"
+        )
         dri_fig = heatmap_bubble_dri(self.full_map)
         qs_fig = plot_source_volume_vs_loss(self.dataset, title="Source Benchmark")
 
@@ -266,36 +264,45 @@ class JoinData01(FlowSpec):
         self.dri_bytes = fig_to_bytes(dri_fig)
         self.qs_bytes = fig_to_bytes(qs_fig)
 
-        
         current.card.append(Markdown("# 📊 Data Taxonomy & Statistics Dashboard\n---"))
 
         current.card.append(Markdown("### 1. Semantic Clustering"))
-        current.card.append(Markdown("Datasets grouped by semantic similarity of columns."))
+        current.card.append(
+            Markdown("Datasets grouped by semantic similarity of columns.")
+        )
         current.card.append(Image.from_matplotlib(dendrogram_fig))
-        current.card.append(Markdown("<br>")) # Adding a little breathing room
+        current.card.append(Markdown("<br>"))  # Adding a little breathing room
 
         current.card.append(Markdown("### 2. Schema Networks & Relationships"))
         current.card.append(
-            Table([
-                [Markdown("**Relationship Graph**"), Markdown("**Standard Network**"), Markdown("**Alt Layout**")],
+            Table(
                 [
-                    Image.from_matplotlib(relationship_fig), 
-                    Image.from_matplotlib(network_fig),
-                    Image.from_matplotlib(network_fig_2)
+                    [
+                        Markdown("**Relationship Graph**"),
+                        Markdown("**Standard Network**"),
+                        Markdown("**Alt Layout**"),
+                    ],
+                    [
+                        Image.from_matplotlib(relationship_fig),
+                        Image.from_matplotlib(network_fig),
+                        Image.from_matplotlib(network_fig_2),
+                    ],
                 ]
-            ])
+            )
         )
         current.card.append(Markdown("<br>"))
 
         current.card.append(Markdown("### 3. Category Distribution"))
         current.card.append(
-            Table([
-                [Markdown("**Category Lines**"), Markdown("**Category Heatmap**")],
+            Table(
                 [
-                    Image.from_matplotlib(network_fig_3),
-                    Image.from_matplotlib(category_fig)
+                    [Markdown("**Category Lines**"), Markdown("**Category Heatmap**")],
+                    [
+                        Image.from_matplotlib(network_fig_3),
+                        Image.from_matplotlib(category_fig),
+                    ],
                 ]
-            ])
+            )
         )
         current.card.append(Markdown("<br>"))
 
@@ -305,16 +312,18 @@ class JoinData01(FlowSpec):
 
         current.card.append(Markdown("### 5. Data Quality & DRI Focus"))
         current.card.append(
-            Table([
-                [Markdown("**DRI Taxonomy Focus**"), Markdown("**Data Loss vs. Volume**")],
+            Table(
                 [
-                    Image.from_matplotlib(dri_fig),
-                    Image.from_matplotlib(qs_fig)
+                    [
+                        Markdown("**DRI Taxonomy Focus**"),
+                        Markdown("**Data Loss vs. Volume**"),
+                    ],
+                    [Image.from_matplotlib(dri_fig), Image.from_matplotlib(qs_fig)],
                 ]
-            ])
+            )
         )
 
-        plt.close('all')
+        plt.close("all")
         self.next(self.wrap_up)
 
     @step

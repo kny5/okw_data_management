@@ -94,9 +94,9 @@ class Source_06(FlowSpec, TailSteps):
         Extract step.
         Fetches raw data from the Make.Works API and converts it into a DataFrame.
         """
-        self.raw = iter_request(self.api_url)  # Fetch data from API
-        self.data_input = pd.DataFrame(self.raw)  # Convert to DataFrame
-        print(self.data_input.columns.tolist())  # Print column names for debugging
+        self.raw = iter_request(self.api_url)
+        self.data_input = pd.DataFrame(self.raw)
+        print(self.data_input.columns.tolist())
         self.next(self.clean)
 
     @card(type="html")
@@ -146,7 +146,6 @@ class Source_06(FlowSpec, TailSteps):
 
             scraped = scrape_makeworks_page(page_url)
 
-            # Merge scraped fields into row — only fill if currently empty/null
             for field, value in scraped.items():
                 if (
                     field not in row
@@ -160,7 +159,6 @@ class Source_06(FlowSpec, TailSteps):
 
         self.data_input = pd.DataFrame(enriched_rows)
 
-        # Fill lat/lng from address using geocoding if still missing
         missing_coords = self.data_input[
             self.data_input["latitude"].isna() | (self.data_input["latitude"] == "")
         ]
