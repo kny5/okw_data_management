@@ -26,7 +26,7 @@ class TailSteps:
     @step
     def data_map(self):
         """Renders the output DataFrame on a map if the render_map parameter is set to True."""
-        self.html = Plot(self.data_output).render()
+        self.html = Plot(self.data_output).base64_iframe()
         self.next(self.wrapup)
 
     @card(type="blank")
