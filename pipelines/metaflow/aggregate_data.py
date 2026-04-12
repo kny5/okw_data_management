@@ -228,7 +228,7 @@ class JoinData01(FlowSpec):
         """Renders the entire output DataFrame on a map if the render_map parameter is set to True."""
         if self.render_map:
             global LOAD_HTML
-            LOAD_HTML = Plot(self.data_output, max_cluster_rad=60).render()
+            LOAD_HTML = Plot(self.data_output, max_cluster_rad=60).into_html()
             self.html = LOAD_HTML
         self.next(self.wrap_up)
 
