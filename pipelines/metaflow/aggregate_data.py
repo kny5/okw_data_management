@@ -25,6 +25,10 @@ Description: Metaflow pipeline for aggregating data from multiple sources, clean
 """
 
 import pandas as pd
+import matplotlib.pyplot as plt
+    
+import io
+
 from __functions__ import (
     ReverseGeocode,
     cluster_and_aggregate,
@@ -47,7 +51,8 @@ from __visualisations__ import (
     plot_source_volume_vs_loss
 )
 from metaflow import Flow, FlowSpec, card, resources, step, Parameter, Runner, current
-from metaflow.cards import Markdown, Image
+from metaflow.cards import Markdown, Image, Table
+
 
 LOAD_HTML = None
 
@@ -227,95 +232,89 @@ class JoinData01(FlowSpec):
             self.html = LOAD_HTML
         self.next(self.wrap_up)
 
-    @card
+    @card(type='blank')
     @step
     def data_stats(self):
         global types_df, props_df
-        """Generates statistics about the output data, such as the count of entries and the most common words in the 'name' column."""
-        self.most_common_words = (
-            self.data_output["name"].str.split().explode().value_counts().head(20)
-        )
+        
+        def fig_to_bytes(fig):
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', bbox_inches='tight')
+            return buf.getvalue()
 
-        self.classified_data = graph_dataframe_relationships(
-            self.dataset,
-            data_init=INIT_DATA,
-        )
-
-        print(self.most_common_words)
-
-        """Calculates metrics and generates the Dendrogram card."""
-
-        current.card.append(Markdown("# DataFrame Taxonomy Clustering"))
-
-        self.dendrogram_fig = plot_semantic_dendrogram(self.classified_data[0])
-
-        current.card.append(
-            Markdown(
-                "The dendrogram above shows how the datasets cluster together based on the semantic similarity of their columns. Datasets that share more similar column names and concepts are grouped closer together."
-            )
-        )
-        current.card.append(Image.from_matplotlib(self.dendrogram_fig))
-        current.card.append(Markdown("# DataFrame Relationship Graph"))
-        current.card.append(
-            Markdown(
-                "This graph visualizes the relationships between the different datasets based on shared columns and semantic similarity."
-            )
-        )
-        current.card.append(Image.from_matplotlib(self.classified_data[1]))
-        current.card.append(Markdown(str(self.classified_data[0])))
-
+        self.most_common_words = self.data_output["name"].str.split().explode().value_counts().head(20)
+        self.classified_data = graph_dataframe_relationships(self.dataset, data_init=INIT_DATA)
         self.full_map = inspect_classification(INIT_DATA, self.dataset)
 
-        current.card.append(Markdown("# Full Classification Map"))
+        dendrogram_fig = plot_semantic_dendrogram(self.classified_data[0])
+        relationship_fig = self.classified_data[1]
+        network_fig = plot_schema_network(self.dataset, INIT_DATA)
+        network_fig_2 = plot_schema_network_2(self.full_map)
+        network_fig_3 = plot_category_lines(self.full_map)
+        category_fig = plot_category_heatmap(self.full_map)
+        category_fig_4 = create_bubble_density_plot(self.full_map, title="Bubble Density")
+        dri_fig = heatmap_bubble_dri(self.full_map)
+        qs_fig = plot_source_volume_vs_loss(self.dataset, title="Source Benchmark")
+
+        self.dendrogram_bytes = fig_to_bytes(dendrogram_fig)
+        self.relationship_bytes = fig_to_bytes(relationship_fig)
+        self.network_bytes = fig_to_bytes(network_fig)
+        self.network_2_bytes = fig_to_bytes(network_fig_2)
+        self.network_3_bytes = fig_to_bytes(network_fig_3)
+        self.category_bytes = fig_to_bytes(category_fig)
+        self.category_4_bytes = fig_to_bytes(category_fig_4)
+        self.dri_bytes = fig_to_bytes(dri_fig)
+        self.qs_bytes = fig_to_bytes(qs_fig)
+
+        
+        current.card.append(Markdown("# 📊 Data Taxonomy & Statistics Dashboard\n---"))
+
+        current.card.append(Markdown("### 1. Semantic Clustering"))
+        current.card.append(Markdown("Datasets grouped by semantic similarity of columns."))
+        current.card.append(Image.from_matplotlib(dendrogram_fig))
+        current.card.append(Markdown("<br>")) # Adding a little breathing room
+
+        current.card.append(Markdown("### 2. Schema Networks & Relationships"))
         current.card.append(
-            Markdown(
-                "This map shows the classification of all columns across the datasets to inspect how they relate to each other and to common concepts in the manufacturing domain."
-            )
+            Table([
+                [Markdown("**Relationship Graph**"), Markdown("**Standard Network**"), Markdown("**Alt Layout**")],
+                [
+                    Image.from_matplotlib(relationship_fig), 
+                    Image.from_matplotlib(network_fig),
+                    Image.from_matplotlib(network_fig_2)
+                ]
+            ])
         )
-        current.card.append(Markdown(str(self.full_map)))
-        current.card.append(Markdown("# Network Graph of DataFrame Relationships"))
-        
-        self.network_fig = plot_schema_network(self.dataset, INIT_DATA)
-        
-        current.card.append(Image.from_matplotlib(self.network_fig))
+        current.card.append(Markdown("<br>"))
+
+        current.card.append(Markdown("### 3. Category Distribution"))
         current.card.append(
-            Markdown("# Network Graph of DataFrame Relationships ALTERNATIVE LAYOUT")
+            Table([
+                [Markdown("**Category Lines**"), Markdown("**Category Heatmap**")],
+                [
+                    Image.from_matplotlib(network_fig_3),
+                    Image.from_matplotlib(category_fig)
+                ]
+            ])
         )
-        
-        self.network_fig_2 = plot_schema_network_2(self.full_map)
-        
-        current.card.append(Image.from_matplotlib(self.network_fig_2))
-        current.card.append(Markdown("# Category Relationship Lines"))
-        
-        self.network_fig_3 = plot_category_lines(self.full_map)
-        
-        current.card.append(Image.from_matplotlib(self.network_fig_3))
-        current.card.append(Markdown("# Category Column Count"))
-        
-        self.category_fig = plot_category_heatmap(self.full_map)
-        
-        current.card.append(Image.from_matplotlib(self.category_fig))
-        current.card.append(Markdown("# Bubble density of Categories by Dataset"))
-        
-        self.category_fig_4 = create_bubble_density_plot(
-            self.full_map, title="Bubble Density of Categories by Dataset"
+        current.card.append(Markdown("<br>"))
+
+        current.card.append(Markdown("### 4. Bubble Density Overviews"))
+        current.card.append(Image.from_matplotlib(category_fig_4))
+        current.card.append(Markdown("<br>"))
+
+        current.card.append(Markdown("### 5. Data Quality & DRI Focus"))
+        current.card.append(
+            Table([
+                [Markdown("**DRI Taxonomy Focus**"), Markdown("**Data Loss vs. Volume**")],
+                [
+                    Image.from_matplotlib(dri_fig),
+                    Image.from_matplotlib(qs_fig)
+                ]
+            ])
         )
-        
-        current.card.append(Image.from_matplotlib(self.category_fig_4))
-        current.card.append(Markdown("---"))
-        current.card.append(Markdown("# DRI Taxonomy Focus"))
 
-        self.dri_fig = heatmap_bubble_dri(self.full_map)
-
-        current.card.append(Image.from_matplotlib(self.dri_fig))
-        current.card.append(Markdown("Plot data quality metrics for dataset"))
-        
-        self.category_fig_qs = plot_source_volume_vs_loss(
-            self.dataset, title="Source Benchmark: Data Loss vs. Input Volume"
-        )
-        
-        current.card.append(Image.from_matplotlib(self.category_fig_qs))
-
+        plt.close('all')
         self.next(self.wrap_up)
 
     @step
