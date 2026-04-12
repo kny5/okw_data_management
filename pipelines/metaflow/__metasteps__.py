@@ -27,9 +27,13 @@ class TailSteps:
     def data_map(self):
         """Renders the output DataFrame on a map if the render_map parameter is set to True."""
         
-        self.map = Plot(self.data_output)
+        map_output = Plot(self.data_output)
+        map_input = Plot(self.data_input)
 
-        self.html = self.map.into_html()
+        self.map_output = map_output.into_html()
+
+        self.map_input = map_input.into_html()
+
         
         self.next(self.wrapup)
 
