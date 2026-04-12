@@ -213,6 +213,7 @@ class Plot:
             title_cancel="Exit",
             force_separate_button=True,
         ).add_to(self.m)
+        return self.m
 
     def render(self):
         return self.m.get_root().render()
