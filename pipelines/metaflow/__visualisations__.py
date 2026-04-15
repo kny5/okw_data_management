@@ -36,9 +36,10 @@ import networkx as nx
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 import pandas as pd
-import pandas as pd
 import seaborn as sns
 from adjustText import adjust_text
+from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.spatial.distance import pdist
 
 opt.maxBytes = 0
 
@@ -488,10 +489,6 @@ def graph_dataframe_relationships(dataset, data_init):
     return dataset_contents, fig
 
 
-from scipy.cluster.hierarchy import dendrogram, linkage
-from scipy.spatial.distance import pdist
-
-
 def plot_semantic_dendrogram(dataset_contents):
     """
     Takes the dataset_contents dictionary and plots a hierarchical
@@ -677,9 +674,6 @@ def plot_schema_network_2(dataset_contents, exclude_classes=None):
     alpha_map = {"source": 0.95, "category": 0.90, "column": 0.60}
 
     node_list = list(G.nodes())
-    node_colors = [color_map[G.nodes[n]["kind"]] for n in node_list]
-    node_sizes = [size_map[G.nodes[n]["kind"]] for n in node_list]
-    node_alphas = [alpha_map[G.nodes[n]["kind"]] for n in node_list]
 
     fig, ax = plt.subplots(figsize=(20, 16))
 

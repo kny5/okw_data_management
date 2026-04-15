@@ -111,31 +111,6 @@ def req_data(
     return inner()
 
 
-def marsh_json(dataframe):
-    from data_models import ParserSchema
-
-    _schema = ParserSchema()
-
-    location_json_mapping = []
-    for index, row in dataframe.iterrows():
-        data_dict = {
-            "latitude": row["latitude"],
-            "longitude": row["longitude"],
-            "zip_code": row["postal_code"],
-            "extended": row["address_1"],
-            "country": row["country_code"],
-            "state_region": row["county"],
-            "city_town": row["city"],
-            "org_id": row["org_id"],
-            "description": "fablab",
-            "name": row["name"],
-            "url": row["url"],
-        }
-        location_json_mapping.append(_schema.dumping(data_dict))
-
-    return location_json_mapping
-
-
 def filter_points_by_proximity(df, radius=100, min_points=2):
 
     df = df.dropna(subset=["latitude", "longitude"])

@@ -27,7 +27,9 @@ Description: Metaflow pipeline for aggregating data from multiple sources, clean
 import pandas as pd
 import matplotlib.pyplot as plt
 
+import os
 import io
+
 
 from __functions__ import (
     ReverseGeocode,
@@ -188,6 +190,7 @@ class JoinData01(FlowSpec):
             self.data_table,
             self.data_map,
             self.data_stats,
+            self.data_pack,
             self.territories,
         )
 
@@ -327,6 +330,15 @@ class JoinData01(FlowSpec):
         self.next(self.wrap_up)
 
     @step
+    def data_pack(self):
+        for source, data in self.dataset.items():
+            for ddff in data:
+                data["data_input"].to_parquet(
+                    os.path.join("data", f"{source}_{ddff}.parquet")
+                )
+        self.next(self.wrap_up)
+
+    @step
     def joint(self, inputs):
         """Joins the outputs from the different visualization steps and prepares the data for the final wrap-up step."""
         self.data_output = inputs[0].data_output
@@ -356,11 +368,9 @@ class JoinData01(FlowSpec):
 
         self.next(self.wrap_up)
 
-    @card
     @step
     def wrap_up(self, inputs):
         """Finalizes the output data by safely propagating the dataframes."""
-
         self.next(self.end)
 
     @step
